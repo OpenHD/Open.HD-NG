@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(Open.HD-NG)
 
-set(PKG_VERSION "0.9.1")
+set(PKG_VERSION "0.9.2")
 
 # Point to our local cmake files
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
