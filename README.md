@@ -14,7 +14,8 @@ git submodule update --init
 ### Install dependencies
 
 ~~~
-sudo apt install python3-iniparse cmake cython libv4l-dev
+sudo apt install cython libv4l-dev python3-numpy python3-serial python3-lxml python3-picamera
+sudo pip3 install pymavlink
 ~~~
 
 Install wifibroadcast_bridge from here: https://github.com/webbbn/wifibroadcast_bridge
