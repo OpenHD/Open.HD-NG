@@ -14,7 +14,7 @@ git submodule update --init
 ### Install dependencies
 
 ~~~
-sudo apt install python3-iniparse cmake
+sudo apt install python3-iniparse cmake cython libv4l-dev
 ~~~
 
 Install wifibroadcast_bridge from here: https://github.com/webbbn/wifibroadcast_bridge
