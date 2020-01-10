@@ -1,4 +1,4 @@
-[![Actions Status](https://github.com/OpenHD/Open.HD-NG/workflows/build-debs/badge.svg)
+[![Actions Status](https://github.com/OpenHD/Open.HD-NG/workflows/build-debs/badge.svg)  [ ![Download](https://api.bintray.com/packages/webbbn/openhd_test/Open.HD-NG/images/download.svg) ](https://bintray.com/webbbn/openhd_test/Open.HD-NG/_latestVersion)
 
 # Open.HD-NG
 Refactor and update of OpenHD
