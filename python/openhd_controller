@@ -37,196 +37,130 @@ import logging
 import logging.handlers
 import configparser
 import multiprocessing as mp
+import pyudev as udev
 
-from openhd import camera, telemetry, video_player
+from openhd import camera, openhd_air, video_player
 
 # Define an exit handler to do a graceful shutdown
+terminate = False
 def exit_handler(sig, frame):
-    sys.exit()
+    global terminate
+    terminate = True
 
-if __name__ == '__main__':
+# Create the udev class for receiving events when USB cameras are plugged/unplugged
+udev_context = udev.Context()
 
-    # This program normally gets it's configuration from it's own config file,
-    # but a second, OpenHD config file can also be used to update the setting
-    # and also update the setting of the other OpenHD components.
-    #
-    # The first argument should be the component config file.
-    # An option second argument is the OpenHD config file
-    if len(sys.argv) != 2 and len(sys.argv) != 3:
-        sys.stderr.write("Usage: " + sys.argv[0] + " <config file>\n")
-        exit(1)
-    config_filename = sys.argv[1]
+# The first and only argument should be the component config file.
+if len(sys.argv) != 2:
+    sys.stderr.write("Usage: " + sys.argv[0] + " <config file>\n")
+    exit(1)
+config_filename = sys.argv[1]
 
-    # Read the config file
-    config = configparser.ConfigParser()
-    config['global'] = {
-        'log_level': 'critical',
-        'syslog_level': 'info',
-        'primary_camera': True,
-        'video_port': 5600,
-        'video_width': 10000,
-        'video_height': 10000,
-        'video_blocksize': 1400,
-        'fps': 60,
-        'bitrate': 3000000,
-        'quality': 20,
-        'inline_headers': True,
-        'intra_period': 5,
-        'prefer_picam': True,
-        'secondary_camera': False,
-        'video_port_secondary': 5601,
-        'video_width_secondary': 10000,
-        'video_height_secondary': 10000,
-        'video_blocksize_secondary': 1400,
-        'fps_secondary': 60,
-        'bitrate_secondary': 3000000,
-        'quality_secondary': 20,
-        'inline_headers_secondary': True,
-        'intra_period_secondary': 5,
-        'prefer_picam_secondary': True,
-        'fec_ratio_secondary': 0,
-        'telemetry_uart': '/dev/ttyS0',
-        'telemetry_baudrate': 115200,
-        'rc_host': '127.0.0.1',
-        'rc_port': 15441,
-        'telemetry_protocol': 'mavlink',
-        'telemetry_host': '127.0.0.1',
-        'telemetry_port': 14550,
-        'telemetry_uart': '/dev/ttyS0'
-    }
-    try:
-        config.read(config_filename)
-    except:
-        print("Error reading the configuration file: " + config_filename)
-        exit
+# Read the config file
+config = configparser.ConfigParser()
+config['global'] = {
+    'log_level': 'critical',
+    'syslog_level': 'info',
+    'primary_camera': True,
+    'video_port': 5600,
+    'video_width': 10000,
+    'video_height': 10000,
+    'video_blocksize': 1400,
+    'fps': 60,
+    'bitrate': 3000000,
+    'quality': 20,
+    'inline_headers': True,
+    'intra_period': 5,
+    'prefer_picam': True,
+    'secondary_camera': False,
+    'video_port_secondary': 5601,
+    'video_width_secondary': 10000,
+    'video_height_secondary': 10000,
+    'video_blocksize_secondary': 1400,
+    'fps_secondary': 60,
+    'bitrate_secondary': 3000000,
+    'quality_secondary': 20,
+    'inline_headers_secondary': True,
+    'intra_period_secondary': 5,
+    'prefer_picam_secondary': True,
+    'fec_ratio_secondary': 0,
+    'telemetry_uart': '/dev/ttyS0',
+    'telemetry_baudrate': 115200,
+    'rc_host': '127.0.0.1',
+    'rc_port': 15441,
+    'telemetry_protocol': 'mavlink',
+    'telemetry_host': '127.0.0.1',
+    'telemetry_port': 14550,
+    'telemetry_uart': '/dev/ttyS0'
+}
+try:
+    config.read(config_filename)
+except:
+    print("Error reading the configuration file: " + config_filename)
+    exit
 
-    # Configure the logger
-    log_level = getattr(logging, config['global'].get('log_level').upper())
-    syslog_level = getattr(logging, config['global'].get('syslog_level').upper())
-    if not isinstance(log_level, int):
-        print("Invalid log level: %s - setting to info" % (args.log_level))
-        log_level = logging.INFO
-    if not isinstance(syslog_level, int):
-        print("Invalid syslog level: %s - setting to info" % (args.syslog_level))
-        syslog_level = logging.INFO
-    logger = logging.getLogger('wifi_config')
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(log_level)
-    syslog_handler = logging.handlers.SysLogHandler(address = "/dev/log")
-    syslog_handler.setLevel(syslog_level)
-    logging.basicConfig(level=min(log_level, syslog_level), format="%(asctime)s %(levelname)s: %(message)s",
-                        datefmt="%H:%M:%S", handlers = [stream_handler, syslog_handler])
+# Configure the logger
+log_level = getattr(logging, config['global'].get('log_level').upper())
+syslog_level = getattr(logging, config['global'].get('syslog_level').upper())
+if not isinstance(log_level, int):
+    print("Invalid log level: %s - setting to info" % (args.log_level))
+    log_level = logging.INFO
+if not isinstance(syslog_level, int):
+    print("Invalid syslog level: %s - setting to info" % (args.syslog_level))
+    syslog_level = logging.INFO
+logger = logging.getLogger('wifi_config')
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(log_level)
+syslog_handler = logging.handlers.SysLogHandler(address = "/dev/log")
+syslog_handler.setLevel(syslog_level)
+logging.basicConfig(level=min(log_level, syslog_level), format="%(asctime)s %(levelname)s: %(message)s",
+                    datefmt="%H:%M:%S", handlers = [stream_handler, syslog_handler])
 
-    # Determine if we're running as ground or air by detecting if a camera is present
-    cameras = camera.detect_cameras()
-    if len(cameras) > 0:
-        is_ground = False
-        logging.info("At least one camera detected, so running in Air mode")
-    else:
-        is_ground = True
-        logging.info("No camera detected, so running in Ground mode")
-        
-    # Setup an exit handler to gracefully exit
-    signal.signal(signal.SIGINT, exit_handler)
+# Determine if we're running as ground or air by detecting if a camera is present
+cameras = camera.detect_cameras()
+if len(cameras) > 0:
+    is_ground = False
+    logging.info("At least one camera detected, so running in Air mode")
+else:
+    is_ground = True
+    logging.info("No camera detected, so running in Ground mode")
 
-    # Start the camera process(es) if we're the air side
-    cam = None
-    cam2 = None
-    if not is_ground:
+# Setup an exit handler to gracefully exit
+signal.signal(signal.SIGINT, exit_handler)
 
-        # Determine the primary camera device
-        primary_camera = config['global'].get('primary_camera')
-        primary_camera_index = -1
-        if primary_camera is not False:
-            if primary_camera == True or primary_camera == "True":
-                primary_camera_index = 0
-            else:
-                for i, camer in enumerate(cameras):
-                    if camer[0]['device'] == primary_camera:
-                        primary_camera_index = i
+# Start the camera process(es) if we're the air side
+if not is_ground:
 
-        # Determine the secondary camera device
-        secondary_camera = config['global'].get('secondary_camera')
-        secondary_camera_index = -1
-        if secondary_camera is not False:
-            if secondary_camera == True or secondary_camera == "True":
-                for i, camer in enumerate(cameras):
-                    if i != primary_camera_index:
-                        secondary_camera_index = i
-                        break
-            else:
-                for i, camer in enumerate(cameras):
-                    if camer[0]['device'] == secondary_camera:
-                        secondary_camera_index = i
+    air_handler = openhd_air.OpenHDAir(config, cameras)
 
-        # Create the primary camera process if we found a device to use
-        if primary_camera_index >= 0:
-            cam = camera.CameraProcess(device=cameras[primary_camera_index][0]['device'],
-                                       width=int(config['global'].get('video_width')),
-                                       height=int(config['global'].get('video_height')),
-                                       fps=int(config['global'].get('fps')),
-                                       bitrate=int(config['global'].get('bitrate')),
-                                       quality=int(config['global'].get('quality')),
-                                       inline_headers=bool(config['global'].get('inline_headers')),
-                                       intra_period=int(config['global'].get('intra_period')),
-                                       prefer_picam=bool(config['global'].get('prefer_picam')),
-                                       blocksize=int(config['global'].get('video_blocksize')),
-                                       fec_ratio=float(config['global'].get('fec_ratio')),
-                                       port=int(config['global'].get('video_port')))
-            logging.info("Using %s as primary camera",
-                         (cameras[primary_camera_index][0]['device']))
-            cam.start()
+    while not terminate:
+        time.sleep(1)
 
-        # Start a secondary camera process?
-        if secondary_camera_index >= 0:
-            cam2 = camera.CameraProcess(device=cameras[secondary_camera_index][0]['device'],
-                                        width=int(config['global'].get('video_width_secondary')),
-                                        height=int(config['global'].get('video_height_secondary')),
-                                        fps=int(config['global'].get('fps_secondary')),
-                                        bitrate=int(config['global'].get('bitrate_secondary')),
-                                        quality=int(config['global'].get('quality_secondary')),
-                                        inline_headers=bool(config['global'].get('inline_headers_secondary')),
-                                        intra_period=int(config['global'].get('intra_period_secondary')),
-                                        prefer_picam=bool(config['global'].get('prefer_picam_secondary')),
-                                        blocksize=int(config['global'].get('video_blocksize_secondary')),
-                                        fec_ratio=float(config['global'].get('fec_ratio_secondary')),
-                                        port=int(config['global'].get('video_port_secondary')))
-            logging.info("Using %s as secondary camera",
-                         (cameras[secondary_camera_index][0]['device']))
-            cam2.start()
+air_handler = None
+exit(0)
 
-    # Start the telemetry parsers / forwarders
-    if not is_ground:
-        telem = telemetry.Telemetry(protocol=config['global'].get('telemetry_protocol'),
-                                    uart=config['global'].get('telemetry_uart'),
-                                    baudrate=config['global'].get('telemetry_baudrate'),
-                                    host=config['global'].get('telemetry_host'),
-                                    port=int(config['global'].get('telemetry_port')))
-    else:
-        telem = None
-
-    # Start the video/osd player if ground
-    if is_ground:
-        video = video_player.VideoPlayer()
-        if not video.running():
-            video = None
-    else:
+# Start the video/osd player if ground
+if is_ground:
+    video = video_player.VideoPlayer()
+    if not video.running():
         video = None
+else:
+    video = None
 
-    # Wait for the processing threads to exit
-    if is_ground:
-        logging.info("Running in Ground mode")
-    else:
-        logging.info("Running in Air mode")
-    if telem:
-        telem.join()
-    if cam:
-        cam.join()
-    if cam2:
-        cam2.join()
-    if video:
-        video.join()
-    if not telem and not cam and not video:
-        while 1:
-            time.sleep(1)
+# Wait for the processing threads to exit
+if is_ground:
+    logging.info("Running in Ground mode")
+else:
+    logging.info("Running in Air mode")
+if telem:
+    telem.join()
+if cam:
+    cam.join()
+if cam2:
+    cam2.join()
+if video:
+    video.join()
+if not telem and not cam and not video:
+    while 1:
+        time.sleep(1)
 

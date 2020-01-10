@@ -25,7 +25,8 @@ target_link_libraries(py_v4l2  ${PYTHON_LIBRARY} ${Extra_Libraries} v4l2)
 install(TARGETS fec py_v4l2 DESTINATION ${RELATIVE_PYTHON_DIR})
 
 # Install the python executable scripts
-install(PROGRAMS openhd_controller DESTINATION ${BinDir})
+install(PROGRAMS openhd_camera DESTINATION ${BinDir})
+install(PROGRAMS openhd_telemetry DESTINATION ${BinDir})
 
 # Install the python libraries
 install(FILES

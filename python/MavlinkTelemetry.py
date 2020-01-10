@@ -6,8 +6,8 @@ import logging
 import threading
 import socket
 import serial
-import pymavlink.mavutil as mavutil
-from pymavlink.dialects.v10 import ardupilotmega as mavlink2
+#import pymavlink.mavutil as mavutil
+#from pymavlink.dialects.v10 import ardupilotmega as mavlink2
 
 class MavlinkTelemetry(object):
     """
@@ -53,6 +53,10 @@ class MavlinkTelemetry(object):
     def __del__(self):
         self.done = True
         self.join()
+
+    def stop(self):
+        self.done = True
+        self.thread.terminate()
 
     def join(self):
         if self.thread:

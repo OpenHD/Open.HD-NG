@@ -1,0 +1,13 @@
+[Unit]
+Description=Camera controller for OpenHD
+BindsTo=air.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/openhd
+ExecStart=/usr/bin/openhd_camera /etc/default/openhd
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=air.target

@@ -1,4 +1,4 @@
-[![Actions Status](https://github.com/webbbn/Open.HD-NG/workflows/build-debs/badge.svg)
+[![Actions Status](https://github.com/OpenHD/Open.HD-NG/workflows/build-debs/badge.svg)
 
 # Open.HD-NG
 Refactor and update of OpenHD

@@ -195,8 +195,11 @@ class Camera(object):
             frame = Frame(self.device, self.width, self.height)
             self.streaming = True
             while self.streaming:
-                frame_data = frame.get_frame()
-                self.stream.write(frame_data)
+                try:
+                    frame_data = frame.get_frame()
+                    self.stream.write(frame_data)
+                except Excption as e:
+                    logging.error(e)
 
     def wait_streaming(self, time):
         if self.camera:
@@ -235,6 +238,9 @@ class CameraProcess(object):
         self.proc = mp.Process(target=self.run)
         self.proc.start()
         return True;
+
+    def stop(self):
+        self.proc.terminate()
 
     def run(self):
         if self.host != "":

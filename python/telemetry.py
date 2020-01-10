@@ -6,8 +6,8 @@ import queue
 import threading
 import socket
 import struct
-import pymavlink.mavutil as mavutil
-from pymavlink.dialects.v10 import ardupilotmega as mavlink2
+#import pymavlink.mavutil as mavutil
+#from pymavlink.dialects.v10 import ardupilotmega as mavlink2
 from openhd.MultiWii import MultiWii
 from openhd.MavlinkTelemetry import MavlinkTelemetry
 
@@ -63,13 +63,25 @@ class Telemetry(object):
         self.done = True
         self.join()
 
+    def stop(self):
+        print("telemetry stop")
+        self.done = True
+        if self.msp_thread:
+            self.thread.stop()
+        if self.recv_thread:
+            self.recv_thread.stop()
+        if self.mavlink:
+            self.mavlink.stop()
+
     def join(self):
+        print("telemetry join")
         if self.msp_thread:
             self.thread.join()
         if self.recv_thread:
-            self.recv_thread.start()
+            self.recv_thread.join()
         if self.mavlink:
             self.mavlink.join()
+        print("telemetry joined")
                     
     def start_msp(self):
 

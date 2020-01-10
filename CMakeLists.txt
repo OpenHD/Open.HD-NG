@@ -80,9 +80,14 @@ include_directories(${PROJECT_SOURCE_DIR}/modules/mavlink/common)
 
 # Install the configuration files
 install(FILES "${PROJECT_SOURCE_DIR}/conf/openhd" DESTINATION etc/default COMPONENT configuratios)
+install(FILES "${PROJECT_SOURCE_DIR}/conf/20-openhd-camera-detect.rules" DESTINATION /etc/udev/rules.d COMPONENT configuratios)
 
 # Install the service files
-install(FILES "${PROJECT_SOURCE_DIR}/services/openhd.service" DESTINATION etc/systemd/system COMPONENT configuratios)
+install(FILES "${PROJECT_SOURCE_DIR}/services/camera.service" DESTINATION lib/systemd/system COMPONENT configuratios)
+install(FILES "${PROJECT_SOURCE_DIR}/services/telemetry.service" DESTINATION lib/systemd/system COMPONENT configuratios)
+
+# Add uninstall target
+add_custom_target(uninstall "${CMAKE_COMMAND}" -P "${CMAKE_MODULE_PATH}/uninstall.cmake")
 
 # Add the debian debian package dependencies
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "libboost-all-dev,cython3,libv4l-dev")
