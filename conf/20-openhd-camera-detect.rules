@@ -1,5 +1,0 @@
-#SUBSYSTEM=="video4linux", KERNEL=="video0", TAG+="systemd",
-#KERNEL=="video0", SYMLINK="video0", TAG+="systemd"
-#KERNEL=="video1", SYMLINK="video1", TAG+="systemd"
-#ACTION=="add", SUBSYSTEM=="video4linux", TAG+="systemd", ENV{SYSTEMD_WANTS}="air.target"
-#ACTION=="remove", SUBSYSTEM=="video4linux", TAG+="systemd", ENV{SYSTEMD_WANTS}="ground.target"

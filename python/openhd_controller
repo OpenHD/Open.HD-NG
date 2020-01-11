@@ -3,55 +3,24 @@
 import os
 import sys
 
-# Setup some paths based on the directory that this script was run frum.
-root_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-
-# Add the library directory to the LD_LIBRARY_PATH environement variable.
-lib_dir = os.path.join(root_dir, "lib")
-# Add the bin directory to PATH
-bin_dir = os.path.join(root_dir, "bin")
-if 'LD_LIBRARY_PATH' not in os.environ:
-    os.environ['LD_LIBRARY_PATH'] = lib_dir
-else:
-    os.environ['LD_LIBRARY_PATH'] += ":" + lib_dir
-os.environ['PATH'] += ":" + bin_dir
-if 'RE_EXECED' not in os.environ:
-    try:
-        os.environ['RE_EXECED'] = "1"
-        os.execv(sys.argv[0], sys.argv)
-    except Exception as exc:
-        print('Failed re-exec:', exc)
-        sys.exit(1)
-
-# Add the python directory to the python path
-python_dir = os.path.join(root_dir, "lib/python" + str(sys.version_info.major) + \
-                          "." + str(sys.version_info.minor) + "/site-packages")
-sys.path.append(python_dir)
-
 import io
 import time
 import queue
 import argparse
 import signal
 import logging
+from functools import partial
 import logging.handlers
 import configparser
-import multiprocessing as mp
 import pyudev as udev
 
-from openhd import camera, openhd_air, video_player
-
-# Define an exit handler to do a graceful shutdown
-terminate = False
-def exit_handler(sig, frame):
-    global terminate
-    terminate = True
+from openhd import camera
 
 # Create the udev class for receiving events when USB cameras are plugged/unplugged
 udev_context = udev.Context()
 
 # The first and only argument should be the component config file.
-if len(sys.argv) != 2:
+if len(sys.argv) != 2 or not os.path.isfile(sys.argv[1]):
     sys.stderr.write("Usage: " + sys.argv[0] + " <config file>\n")
     exit(1)
 config_filename = sys.argv[1]
@@ -61,37 +30,6 @@ config = configparser.ConfigParser()
 config['global'] = {
     'log_level': 'critical',
     'syslog_level': 'info',
-    'primary_camera': True,
-    'video_port': 5600,
-    'video_width': 10000,
-    'video_height': 10000,
-    'video_blocksize': 1400,
-    'fps': 60,
-    'bitrate': 3000000,
-    'quality': 20,
-    'inline_headers': True,
-    'intra_period': 5,
-    'prefer_picam': True,
-    'secondary_camera': False,
-    'video_port_secondary': 5601,
-    'video_width_secondary': 10000,
-    'video_height_secondary': 10000,
-    'video_blocksize_secondary': 1400,
-    'fps_secondary': 60,
-    'bitrate_secondary': 3000000,
-    'quality_secondary': 20,
-    'inline_headers_secondary': True,
-    'intra_period_secondary': 5,
-    'prefer_picam_secondary': True,
-    'fec_ratio_secondary': 0,
-    'telemetry_uart': '/dev/ttyS0',
-    'telemetry_baudrate': 115200,
-    'rc_host': '127.0.0.1',
-    'rc_port': 15441,
-    'telemetry_protocol': 'mavlink',
-    'telemetry_host': '127.0.0.1',
-    'telemetry_port': 14550,
-    'telemetry_uart': '/dev/ttyS0'
 }
 try:
     config.read(config_filename)
@@ -117,50 +55,35 @@ logging.basicConfig(level=min(log_level, syslog_level), format="%(asctime)s %(le
                     datefmt="%H:%M:%S", handlers = [stream_handler, syslog_handler])
 
 # Determine if we're running as ground or air by detecting if a camera is present
-cameras = camera.detect_cameras()
-if len(cameras) > 0:
-    is_ground = False
-    logging.info("At least one camera detected, so running in Air mode")
-else:
-    is_ground = True
-    logging.info("No camera detected, so running in Ground mode")
+def detect_cameras():
+    os.system("/bin/systemctl stop air.target")
+    os.system("/bin/systemctl stop ground.target")
+    cameras = camera.detect_cameras()
+    if len(cameras) > 0 and mode != "air":
+        logging.info("At least one camera detected, so running in Air mode")
+        os.system("/bin/systemctl start air.target")
+    elif mode != "ground":
+        logging.info("No camera detected, so running in Ground mode")
+        os.system("/bin/systemctl start ground.target")
 
-# Setup an exit handler to gracefully exit
+# Define an exit handler to do a graceful shutdown
+def exit_handler(sig, frame):
+    exit(0)
 signal.signal(signal.SIGINT, exit_handler)
 
-# Start the camera process(es) if we're the air side
-if not is_ground:
+# First try to detect any cameras already present.
+mode = None
+detect_cameras()
 
-    air_handler = openhd_air.OpenHDAir(config, cameras)
-
-    while not terminate:
-        time.sleep(1)
-
-air_handler = None
-exit(0)
-
-# Start the video/osd player if ground
-if is_ground:
-    video = video_player.VideoPlayer()
-    if not video.running():
-        video = None
-else:
-    video = None
-
-# Wait for the processing threads to exit
-if is_ground:
-    logging.info("Running in Ground mode")
-else:
-    logging.info("Running in Air mode")
-if telem:
-    telem.join()
-if cam:
-    cam.join()
-if cam2:
-    cam2.join()
-if video:
-    video.join()
-if not telem and not cam and not video:
-    while 1:
-        time.sleep(1)
-
+# Monitor for any camera getting plugged in or unplugged
+monitor = udev.Monitor.from_netlink(udev_context)
+monitor.filter_by(subsystem='video4linux')
+# Wait as long as it takes to get the first change
+for device in iter(monitor.poll, None):
+    logging.debug("Detected camera change")
+    # Some devices create multiple device nodes.
+    # This should compress all the events down to one
+    for device in iter(partial(monitor.poll, 1), None):
+        logging.debug("Ignoring a camera change")
+    # (re)detect the cameras
+    detect_cameras()

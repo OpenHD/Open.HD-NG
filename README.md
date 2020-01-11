@@ -11,11 +11,17 @@ Refactor and update of OpenHD
 git submodule update --init
 ~~~
 
-### Install dependencies
+### Install dependencies on a Raspberry Pi
 
 ~~~
-sudo apt install cython libv4l-dev python3-numpy python3-serial python3-lxml python3-picamera
+sudo apt install cython libv4l-dev python3-numpy python3-serial python3-lxml
 sudo pip3 install pymavlink
+~~~
+
+### Install Raspberry Pi specific dependencies
+
+~~~
+sudo apt install python3-picamera
 ~~~
 
 Install wifibroadcast_bridge from here: https://github.com/webbbn/wifibroadcast_bridge

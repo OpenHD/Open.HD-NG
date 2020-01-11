@@ -198,7 +198,7 @@ class Camera(object):
                 try:
                     frame_data = frame.get_frame()
                     self.stream.write(frame_data)
-                except Excption as e:
+                except Exception as e:
                     logging.error(e)
 
     def wait_streaming(self, time):

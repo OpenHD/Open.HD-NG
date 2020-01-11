@@ -6,6 +6,7 @@ BindsTo=air.target
 Type=simple
 EnvironmentFile=/etc/default/openhd
 ExecStart=/usr/bin/openhd_telemetry /etc/default/openhd
+TimeoutStopSec=5s
 Restart=always
 RestartSec=5s
 

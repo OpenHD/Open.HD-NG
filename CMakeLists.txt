@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(Open.HD-NG)
 
-set(PKG_VERSION "0.9.3")
+set(PKG_VERSION "0.9.4")
 
 # Point to our local cmake files
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
@@ -81,9 +81,10 @@ include_directories(${PROJECT_SOURCE_DIR}/modules/mavlink/common)
 
 # Install the configuration files
 install(FILES "${PROJECT_SOURCE_DIR}/conf/openhd" DESTINATION etc/default COMPONENT configuratios)
-install(FILES "${PROJECT_SOURCE_DIR}/conf/20-openhd-camera-detect.rules" DESTINATION /etc/udev/rules.d COMPONENT configuratios)
+install(FILES "${PROJECT_SOURCE_DIR}/conf/99-openhd-camera.rules" DESTINATION /lib/udev/rules.d COMPONENT configuratios)
 
 # Install the service files
+install(FILES "${PROJECT_SOURCE_DIR}/services/openhd.service" DESTINATION lib/systemd/system COMPONENT configuratios)
 install(FILES "${PROJECT_SOURCE_DIR}/services/camera.service" DESTINATION lib/systemd/system COMPONENT configuratios)
 install(FILES "${PROJECT_SOURCE_DIR}/services/telemetry.service" DESTINATION lib/systemd/system COMPONENT configuratios)
 
