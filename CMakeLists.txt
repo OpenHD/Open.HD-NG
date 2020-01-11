@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(Open.HD-NG)
 
-set(PKG_VERSION "0.9.5")
+set(VERSION "0.9.6")
 
 # Point to our local cmake files
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
@@ -97,7 +97,7 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "libboost-all-dev,cython3,libv4l-dev")
 set(CPACK_GENERATOR "DEB")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "webbbn@gmail.con")
 set(CPACK_DEBIAN_FILE_NAME "DEB-DEFAULT")
-set(CPACK_PACKAGE_VERSION ${PKG_VERSION})
+set(CPACK_PACKAGE_VERSION ${VERSION})
 set(CPACK_PACKAGE_INSTALL_DIRECTORY /)
 set(CPACK_SET_DESTDIR true)
 set(CPACK_INSTALL_PREFIX /)
