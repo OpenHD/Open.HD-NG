@@ -1,6 +1,0 @@
-#!/bin/sh
-
-APIKEY=$1
-VER=`cat build/version`
-
-curl -X POST -uwebbbn:${APIKEY} "https://api.bintray.com/content/webbbn/openhd_test/Open.HD-NG/${VER}/publish" -d "{ \"discard\": \"false\" }"
