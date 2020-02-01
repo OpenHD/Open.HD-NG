@@ -14,8 +14,7 @@ git submodule update --init
 ### Install dependencies on a Raspberry Pi
 
 ~~~
-sudo apt install cython libv4l-dev python3-numpy python3-serial python3-lxml
-sudo pip3 install pymavlink
+sudo apt install cython libv4l-dev python3-numpy python3-serial python3-lxml libasio-dev
 ~~~
 
 ### Install Raspberry Pi specific dependencies

@@ -2,7 +2,7 @@
 
 # Install the build dependencies
 apt-get update
-apt-get install -y git libboost-all-dev cmake build-essential cython3 libv4l-dev
+apt-get install -y git libboost-all-dev cmake build-essential cython3 libv4l-dev libasio-dev
 
 # Make sure the submodules are updated
 git submodule update --init

@@ -1,3 +1,6 @@
 [submodule "modules/mavlink"]
 	path = modules/mavlink
 	url = https://github.com/mavlink/c_library_v2.git
+[submodule "modules/msp"]
+	path = modules/msp
+	url = https://github.com/webbbn/msp.git

@@ -21,7 +21,7 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/version ${VERSION})
 
 # Build optimized
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG -DBOOST_LOG_DYN_LINK")
 
 # Add the usr directory to most of the paths if the installcation directory is /
 set(BinDir "usr/bin")
@@ -46,9 +46,12 @@ if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
   endif()
 endif()
 
-# Ensure the mavlink directory was checked out successfully
+# Ensure the mavlink and msp directories were checked out successfully
 if(NOT EXISTS "${PROJECT_SOURCE_DIR}/modules/mavlink/protocol.h")
   message(FATAL_ERROR "The mavlink submodule was not downloaded! Please update submodules and try again.")
+endif()
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/modules/msp/inc/msp/msp_msg.hpp")
+  message(FATAL_ERROR "The msp submodule was not downloaded! Please update submodules and try again.")
 endif()
 
 # Add the local include directory to the include path
@@ -65,6 +68,10 @@ else ()
   set(RELATIVE_PYTHON_DIR "${LibDir}/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}/${PythonDistDir}/openhd")
 endif ()
 
+# Add the msp sudmodule to the list of directories to build
+add_subdirectory(modules/msp)
+include_directories(modules/msp/inc)
+
 # Add the python directory to the list of directories to build
 add_subdirectory(python)
 
@@ -79,6 +86,16 @@ include_directories(${Boost_INCLUDE_DIR})
 # Add the mavlink directory to the build
 include_directories(${PROJECT_SOURCE_DIR}/modules/mavlink/common)
 
+# Build the MSP to Mavlink converter
+add_executable(msp_to_mavlink src/msp_to_mavlink.cc src/MSPTelemetry.cc src/logging.cc)
+install(TARGETS msp_to_mavlink DESTINATION ${BinDir} COMPONENT applications)
+target_link_libraries(msp_to_mavlink ${Boost_LIBRARIES} msp_fcu pthread)
+
+# Build the TBS Crossfire interface
+add_executable(crsf_receiver src/crsf_receiver.cc src/CRSFTelemetry.cc src/logging.cc)
+install(TARGETS crsf_receiver DESTINATION ${BinDir} COMPONENT applications)
+target_link_libraries(crsf_receiver ${Boost_LIBRARIES} pthread)
+
 # Install the configuration files
 install(FILES "${PROJECT_SOURCE_DIR}/conf/openhd" DESTINATION etc/default COMPONENT configuratios)
 
@@ -86,6 +103,8 @@ install(FILES "${PROJECT_SOURCE_DIR}/conf/openhd" DESTINATION etc/default COMPON
 install(FILES "${PROJECT_SOURCE_DIR}/services/openhd.service" DESTINATION lib/systemd/system COMPONENT configuratios)
 install(FILES "${PROJECT_SOURCE_DIR}/services/camera.service" DESTINATION lib/systemd/system COMPONENT configuratios)
 install(FILES "${PROJECT_SOURCE_DIR}/services/telemetry.service" DESTINATION lib/systemd/system COMPONENT configuratios)
+install(FILES "${PROJECT_SOURCE_DIR}/services/air.target" DESTINATION lib/systemd/system COMPONENT configuration)
+install(FILES "${PROJECT_SOURCE_DIR}/services/ground.target" DESTINATION lib/systemd/system COMPONENT configuration)
 
 # Add uninstall target
 add_custom_target(uninstall "${CMAKE_COMMAND}" -P "${CMAKE_MODULE_PATH}/uninstall.cmake")
