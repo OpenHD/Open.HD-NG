@@ -234,14 +234,6 @@ int main(int argc, char **argv) {
 	    LOG_WARNING << "CRSF Receiver CRC error: " << static_cast<uint32_t>(crc) << " "
 	      << static_cast<uint32_t>(c);
 	  } else {
-	    LOG_DEBUG << "RC: "
-	      << channels.ch0 << " " << channels.ch1 << " " << channels.ch2 << " "
-	      << channels.ch3 << " " << channels.ch4 << " " << channels.ch5 << " "
-	      << channels.ch6 << " " << channels.ch7 << " " << channels.ch8 << " "
-	      << channels.ch9 << " " << channels.ch10 << " " << channels.ch11 << " "
-	      << channels.ch12 << " " << channels.ch13 << " " << channels.ch14 << " "
-	      << channels.ch15 << "  crc: " << static_cast<uint32_t>(crc)
-		      << " " << static_cast<uint32_t>(c);
 	    float scale = 0.62477120195241;
 	    float offset = 880.53935326418548;
 	    telemetry.set_rc(offset + channels.ch0 * scale,
