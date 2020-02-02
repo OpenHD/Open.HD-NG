@@ -1,5 +1,5 @@
-#ifndef RTNAV_CRSFTELEMETRY_HH
-#define RTNAV_CRSFTELEMETRY_HH
+#ifndef OPENHDNG_CRSFTELEMETRY_HH
+#define OPENHDNG_CRSFTELEMETRY_HH
 
 #include <string>
 #include <vector>
@@ -51,7 +51,7 @@ class CRSFTelemetry {
 public:
   typedef SharedQueue<std::vector<uint8_t> > BufferQueue;
 
-  CRSFTelemetry();
+  CRSFTelemetry(uint16_t recv_port = 14551, uint16_t send_port = 14550, uint16_t status_port = 5800);
 
   bool get_value(const std::string &name, float &value) const;
 
@@ -74,16 +74,19 @@ private:
 
   void set_value(const std::string &name, float value);
 
-  void create_link_packet(int8_t rx_rssi1, int8_t rx_rssi2,
-			  uint8_t rx_quality, uint8_t rx_snr,
-			  uint8_t rx_antenna, uint8_t rf_mode,
-			  uint8_t tx_power, int8_t tx_rssi,
-			  uint8_t tx_quality, uint8_t tx_snr);
-  void create_attitude_packet(float yaw_deg, float pitch_deg, float roll_deg);
+  void send_link_packet(int8_t rx_rssi1, int8_t rx_rssi2,
+			uint8_t rx_quality, uint8_t rx_snr,
+			uint8_t rx_antenna, uint8_t rf_mode,
+			uint8_t tx_power, int8_t tx_rssi,
+			uint8_t tx_quality, uint8_t tx_snr);
+  void send_attitude_packet(float yaw_deg, float pitch_deg, float roll_deg);
+  void send_battery_packet(float v, float c, uint32_t cap, float remain);
+  void send_gps_packet(int32_t lat, int32_t lon, uint16_t vel,
+		       uint16_t heading, uint16_t alt, uint8_t nsat);
 
-  void reader_thread();
-  void status_thread();
-  void control_thread();
+  void reader_thread(uint16_t port = 14551);
+  void status_thread(uint16_t port = 5800);
+  void control_thread(uint16_t port = 14550);
 
   //boost::asio::io_service m_send_service;
   //boost::asio::ip::udp::socket m_send_sock;
@@ -98,4 +101,4 @@ private:
   BufferQueue m_send_queue;
 };
 
-#endif /* RTNAV_CRSFTELEMETRY_HH */
+#endif /* OPENHDNG_CRSFTELEMETRY_HH */

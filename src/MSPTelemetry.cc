@@ -39,29 +39,10 @@ MSPTelemetry::MSPTelemetry(const std::string &device, uint32_t baudrate,
 void MSPTelemetry::start() {
 
   // define subscriptions with specific period
-  //m_fcu.subscribe(&MSPTelemetry::onIdent, this, 10);
-  m_fcu.subscribe(&MSPTelemetry::onStatus, this, 1);
-
-  // using class method callback
-  // m_fcu.subscribe(&MSPTelemetry::onImu, this, 0.1);
-
-  //m_fcu.subscribe(&MSPTelemetry::onServo, this, 0.1);
-  //m_fcu.subscribe(&MSPTelemetry::onMotor, this, 0.1);
-  //m_fcu.subscribe(&MSPTelemetry::onRc, this, 0.1);
+  m_fcu.subscribe(&MSPTelemetry::onStatus, this, 0.25);
   m_fcu.subscribe(&MSPTelemetry::onAttitude, this, 0.1);
-  //m_fcu.subscribe(&MSPTelemetry::onAltitude, this);
-  //m_fcu.subscribe(&MSPTelemetry::onAnalog, this, 10);
-  //m_fcu.subscribe(&MSPTelemetry::onRcTuning, this, 20);
-  //m_fcu.subscribe(&MSPTelemetry::onPID, this, 20);
-  //m_fcu.subscribe(&MSPTelemetry::onBox, this, 1);
-  //m_fcu.subscribe(&MSPTelemetry::onMisc, this, 1);
-  //m_fcu.subscribe(&MSPTelemetry::onMotorPins, this, 20);
-  //m_fcu.subscribe(&MSPTelemetry::onBoxNames, this, 1);
-  //m_fcu.subscribe(&MSPTelemetry::onPidNames, this, 20);
-  //m_fcu.subscribe(&MSPTelemetry::onBoxIds, this, 1);
-  //m_fcu.subscribe(&MSPTelemetry::onServoConf, this, 20);
-  //m_fcu.subscribe(&MSPTelemetry::onDebugMessage, this, 1);
-  //m_fcu.subscribe(&MSPTelemetry::onDebug, this, 1);
+  m_fcu.subscribe(&MSPTelemetry::onAnalog, this, 0.25);
+  m_fcu.subscribe(&MSPTelemetry::onRawGPS, this, 0.25);
 
   // Receive Mavlink messages over UDP
   if (!m_recv_thread) {
@@ -83,8 +64,6 @@ void MSPTelemetry::join() {
   m_send_thread->join();
 }
 
-void MSPTelemetry::onIdent(const msp::msg::Ident& ident) { std::cout << ident; }
-
 void MSPTelemetry::onStatus(const msp::msg::Status& status) {
 
   // Send the heartbeat message.
@@ -92,14 +71,6 @@ void MSPTelemetry::onStatus(const msp::msg::Status& status) {
   mavlink_msg_heartbeat_encode(255, 0, &msg_hb, &m_heartbeat);
   send_message(msg_hb);
 }
-
-void MSPTelemetry::onImu(const msp::msg::RawImu& imu_raw) { std::cout << imu_raw; }
-
-void MSPTelemetry::onServo(const msp::msg::Servo& servo) { std::cout << servo; }
-
-void MSPTelemetry::onMotor(const msp::msg::Motor& motor) { std::cout << motor; }
-
-void MSPTelemetry::onRc(const msp::msg::Rc& rc) { std::cout << rc; }
 
 void MSPTelemetry::onAttitude(const msp::msg::Attitude& attitude) {
 
@@ -112,51 +83,64 @@ void MSPTelemetry::onAttitude(const msp::msg::Attitude& attitude) {
   mav_attitude.pitchspeed = 0;
   mav_attitude.yawspeed = 0;
   mavlink_message_t msg_att;
-  std::cerr << "Attutude\n";
   mavlink_msg_attitude_encode(255, 0, &msg_att, &mav_attitude);
   send_message(msg_att);
 }
 
-void MSPTelemetry::onAltitude(const msp::msg::Altitude& altitude) {
-  //std::cout << altitude;
+void MSPTelemetry::onAnalog(const msp::msg::Analog& analog) {
+  uint32_t sensors = MAV_SYS_STATUS_SENSOR_3D_GYRO; //assume we always have gyro
+  sensors |= MAV_SYS_STATUS_SENSOR_YAW_POSITION; 
+  sensors |= m_fcu.hasAccelerometer() ?
+    (MAV_SYS_STATUS_SENSOR_3D_ACCEL | MAV_SYS_STATUS_SENSOR_ATTITUDE_STABILIZATION) : 0;
+  sensors |= m_fcu.hasBarometer() ? MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL : 0;
+  sensors |= m_fcu.hasMagnetometer() ? MAV_SYS_STATUS_SENSOR_3D_MAG : 0;
+  sensors |= m_fcu.hasGPS() ? MAV_SYS_STATUS_SENSOR_GPS : 0;
+  sensors |= m_fcu.hasSonar() ? MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL : 0;
+
+  // Send the system status message
+  mavlink_sys_status_t mav_sys_stat;
+  mav_sys_stat.onboard_control_sensors_present = sensors;
+  mav_sys_stat.onboard_control_sensors_enabled = sensors;
+  mav_sys_stat.onboard_control_sensors_health = sensors;
+  mav_sys_stat.load = 500;
+  mav_sys_stat.voltage_battery = analog.vbat * 100;
+  mav_sys_stat.current_battery = analog.amperage;
+  mav_sys_stat.battery_remaining = -1;
+  mav_sys_stat.drop_rate_comm = 0;
+  mav_sys_stat.errors_comm = 0;
+  mav_sys_stat.errors_count1 = 0;
+  mav_sys_stat.errors_count2 = 0;
+  mav_sys_stat.errors_count3 = 0;
+  mav_sys_stat.errors_count4 = 0;
+  mavlink_message_t msg_ss;
+  mavlink_msg_sys_status_encode(255, 0, &msg_ss, &mav_sys_stat);
+  send_message(msg_ss);
 }
 
-void MSPTelemetry::onAnalog(const msp::msg::Analog& analog) { std::cout << analog; }
+void MSPTelemetry::onRawGPS(const msp::msg::RawGPS& gps) {
 
-void MSPTelemetry::onRcTuning(const msp::msg::RcTuning& rc_tuning) {
-  //std::cout << rc_tuning;
+  // Send the raw GPS message
+  mavlink_gps_raw_int_t mav_gps;
+  mav_gps.time_usec = 0;
+  mav_gps.fix_type = gps.fix;
+  mav_gps.lat = gps.lat;
+  mav_gps.lon = gps.lon;
+  mav_gps.alt = gps.altitude;
+  mav_gps.eph = gps.hdop_set ? gps.hdop : 0;
+  mav_gps.epv = 0;
+  mav_gps.vel = gps.ground_speed;
+  mav_gps.cog = 0;
+  mav_gps.satellites_visible = gps.numSat;
+  mav_gps.alt_ellipsoid = 0;
+  mav_gps.h_acc = 0;
+  mav_gps.v_acc = 0;
+  mav_gps.vel_acc = 0;
+  mav_gps.hdg_acc = 0;
+  mavlink_message_t msg_gps;
+  mavlink_msg_gps_raw_int_encode(255, 0, &msg_gps, &mav_gps);
+  send_message(msg_gps);
 }
 
-void MSPTelemetry::onPID(const msp::msg::Pid& pid) { std::cout << pid; }
-
-void MSPTelemetry::onBox(const msp::msg::ActiveBoxes& box) { std::cout << box; }
-
-void MSPTelemetry::onMisc(const msp::msg::Misc& misc) { std::cout << misc; }
-
-void MSPTelemetry::onMotorPins(const msp::msg::MotorPins& motor_pins) {
-  //std::cout << motor_pins;
-}
-
-void MSPTelemetry::onBoxNames(const msp::msg::BoxNames& box_names) {
-  //std::cout << box_names;
-}
-
-void MSPTelemetry::onPidNames(const msp::msg::PidNames& pid_names) {
-  //std::cout << pid_names;
-}
-
-void MSPTelemetry::onBoxIds(const msp::msg::BoxIds& box_ids) { std::cout << box_ids; }
-
-void MSPTelemetry::onServoConf(const msp::msg::ServoConf& servo_conf) {
-  //std::cout << servo_conf;
-}
-
-void MSPTelemetry::onDebugMessage(const msp::msg::DebugMessage& debug_msg) {
-  std::cout << "#Debug message:" << std::endl;
-  std::cout << debug_msg.debug_msg << std::endl;
-}
-
-void MSPTelemetry::onDebug(const msp::msg::Debug& debug) { std::cout << debug; }
 
 void MSPTelemetry::send_message(const mavlink_message_t &msg) {
   std::shared_ptr<std::vector<uint8_t> > send_buf(new std::vector<uint8_t>(MAVLINK_MAX_MSG));

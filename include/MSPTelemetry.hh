@@ -22,26 +22,11 @@ public:
   void join();
 
 private:
-  void onIdent(const msp::msg::Ident& ident);
   void onStatus(const msp::msg::Status& status);
-  void onImu(const msp::msg::RawImu& imu_raw);
-  void onServo(const msp::msg::Servo& servo);
-  void onMotor(const msp::msg::Motor& motor);
-  void onRc(const msp::msg::Rc& rc);
   void onAttitude(const msp::msg::Attitude& attitude);
-  void onAltitude(const msp::msg::Altitude& altitude);
   void onAnalog(const msp::msg::Analog& analog);
-  void onRcTuning(const msp::msg::RcTuning& rc_tuning);
-  void onPID(const msp::msg::Pid& pid);
-  void onBox(const msp::msg::ActiveBoxes& box);
-  void onMisc(const msp::msg::Misc& misc);
-  void onMotorPins(const msp::msg::MotorPins& motor_pins);
-  void onBoxNames(const msp::msg::BoxNames& box_names);
-  void onPidNames(const msp::msg::PidNames& pid_names);
-  void onBoxIds(const msp::msg::BoxIds& box_ids);
-  void onServoConf(const msp::msg::ServoConf& servo_conf);
-  void onDebugMessage(const msp::msg::DebugMessage& debug_msg);
-  void onDebug(const msp::msg::Debug& debug);
+  void onRawGPS(const msp::msg::RawGPS& gps);
+
   void send_message(const mavlink_message_t &msg);
   void udp_send_loop();
   void udp_receive_loop();

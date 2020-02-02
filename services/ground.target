@@ -1,0 +1,6 @@
+[Unit]
+Description=Controls services required for an OpenHD Ground unit
+Requires=wfb_bridge_ground.service
+
+[Install]
+WantedBy=multi-user.target

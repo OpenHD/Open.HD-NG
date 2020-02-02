@@ -1,0 +1,6 @@
+[Unit]
+Description=Controls services required for an OpenHD Air unit
+Requires=wfb_bridge_air.service
+
+[Install]
+WantedBy=multi-user.target

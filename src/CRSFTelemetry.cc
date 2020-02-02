@@ -14,7 +14,8 @@
 typedef enum {
 	      CRSF_ATTITUDE = 0x1E,
 	      CRSF_BATTERY = 0x08,
-	      CRSF_LINK = 0x14
+	      CRSF_LINK = 0x14,
+	      CRSF_GPS = 0x02
 } CRSFTelemetryType;
 
 // CRC8 implementation with polynom = x^8+x^7+x^6+x^4+x^2+1 (0xD5)
@@ -90,16 +91,24 @@ void big_endian_uint24(std::vector<uint8_t> &buf, uint32_t v) {
   buf.push_back(rvp[0]);
 }
 
+void big_endian_int32(std::vector<uint8_t> &buf, int32_t v) {
+  const uint8_t *rvp = reinterpret_cast<const uint8_t*>(&v);
+  buf.push_back(rvp[3]);
+  buf.push_back(rvp[2]);
+  buf.push_back(rvp[1]);
+  buf.push_back(rvp[0]);
+}
+
 void big_endian_deg_to_radians_10000(std::vector<uint8_t> &buf, float v) {
   big_endian_uint16(buf, static_cast<uint16_t>(rint((v * 10000.0 * M_PI) / 360.0)));
 }
 
 
-CRSFTelemetry::CRSFTelemetry()
-: m_rec_bat_status(false), m_connected(false), m_rc_fresh(false) {
-  std::thread([this]() { this->reader_thread(); }).detach();
-  std::thread([this]() { this->status_thread(); }).detach();
-  std::thread([this]() { this->control_thread(); }).detach();
+CRSFTelemetry::CRSFTelemetry(uint16_t recv_port, uint16_t send_port, uint16_t status_port)
+  : m_rec_bat_status(false), m_connected(false), m_rc_fresh(false) {
+  std::thread([this, recv_port]() { this->reader_thread(recv_port); }).detach();
+  std::thread([this, status_port]() { this->status_thread(status_port); }).detach();
+  std::thread([this, send_port]() { this->control_thread(send_port); }).detach();
 }
 
 bool CRSFTelemetry::get_value(const std::string &name, float &value) const {
@@ -144,22 +153,16 @@ void CRSFTelemetry::set_rc(uint16_t ch1, uint16_t ch2, uint16_t ch3, uint16_t ch
   m_rc_fresh = true;
 }
 
-/*
-const boost::asio::ip::udp::endpoint &CRSFTelemetry::sender_endpoint() {
-  return m_sender_endpoint;
-}
-*/
-
-void CRSFTelemetry::create_link_packet(int8_t rx_rssi1,
-				       int8_t rx_rssi2,
-				       uint8_t rx_quality,
-				       uint8_t rx_snr,
-				       uint8_t rx_antenna,
-				       uint8_t rf_mode,
-				       uint8_t tx_power,
-				       int8_t tx_rssi,
-				       uint8_t tx_quality,
-				       uint8_t tx_snr) {
+void CRSFTelemetry::send_link_packet(int8_t rx_rssi1,
+				     int8_t rx_rssi2,
+				     uint8_t rx_quality,
+				     uint8_t rx_snr,
+				     uint8_t rx_antenna,
+				     uint8_t rf_mode,
+				     uint8_t tx_power,
+				     int8_t tx_rssi,
+				     uint8_t tx_quality,
+				     uint8_t tx_snr) {
   std::shared_ptr<std::vector<uint8_t> > bufp(new std::vector<uint8_t>());
   std::vector<uint8_t> &buf = *bufp.get();
   buf.push_back(CRSF_RADIO_ADDRESS);
@@ -179,7 +182,7 @@ void CRSFTelemetry::create_link_packet(int8_t rx_rssi1,
   m_send_queue.push(buf);
 }
 
-void CRSFTelemetry::create_attitude_packet(float yaw_deg, float pitch_deg, float roll_deg) {
+void CRSFTelemetry::send_attitude_packet(float yaw_deg, float pitch_deg, float roll_deg) {
   std::shared_ptr<std::vector<uint8_t> > bufp(new std::vector<uint8_t>());
   std::vector<uint8_t> &buf = *bufp.get();
   buf.push_back(CRSF_RADIO_ADDRESS);
@@ -192,8 +195,38 @@ void CRSFTelemetry::create_attitude_packet(float yaw_deg, float pitch_deg, float
   m_send_queue.push(buf);
 }
 
+void CRSFTelemetry::send_battery_packet(float v, float c, uint32_t cap, float remain) {
+  std::shared_ptr<std::vector<uint8_t> > bufp(new std::vector<uint8_t>());
+  std::vector<uint8_t> &buf = *bufp.get();
+  buf.push_back(CRSF_RADIO_ADDRESS);
+  buf.push_back(10); // type (1) + Payload size + CRC size (1)
+  buf.push_back(CRSF_BATTERY);
+  big_endian_uint16(buf, static_cast<uint16_t>(rint(v * 100.0)));
+  big_endian_uint16(buf, static_cast<uint16_t>(rint(c * 100.0)));
+  big_endian_uint24(buf, cap);
+  buf.push_back(static_cast<uint8_t>(rint(remain)));
+  add_crc(buf);
+  m_send_queue.push(buf);
+}
 
-void CRSFTelemetry::reader_thread() {
+void CRSFTelemetry::send_gps_packet(int32_t lat, int32_t lon, uint16_t vel,
+				    uint16_t heading, uint16_t alt, uint8_t nsat) {
+  std::shared_ptr<std::vector<uint8_t> > bufp(new std::vector<uint8_t>());
+  std::vector<uint8_t> &buf = *bufp.get();
+  buf.push_back(CRSF_RADIO_ADDRESS);
+  buf.push_back(17); // type (1) + Payload size + CRC size (1)
+  buf.push_back(CRSF_GPS);
+  big_endian_int32(buf, lat);
+  big_endian_int32(buf, lon);
+  big_endian_uint16(buf, vel);
+  big_endian_uint16(buf, heading);
+  big_endian_uint16(buf, alt);
+  buf.push_back(nsat);
+  add_crc(buf);
+  m_send_queue.push(buf);
+}
+
+void CRSFTelemetry::reader_thread(uint16_t port) {
   mavlink_message_t msg;
   mavlink_status_t status;
   int max_length = 1024;
@@ -224,12 +257,10 @@ void CRSFTelemetry::reader_thread() {
 	case MAVLINK_MSG_ID_SYS_STATUS:
 	  mavlink_sys_status_t sys_status;
 	  mavlink_msg_sys_status_decode(&msg, &sys_status);
-	  if (!m_rec_bat_status) {
-	    set_value("voltage_battery", sys_status.voltage_battery / 1000.0);
-	    set_value("current_battery",
-		      std::max(sys_status.current_battery, static_cast<short>(0)) / 100.0);
-	    set_value("battery_remaining", sys_status.battery_remaining);
-	  }
+	  LOG_DEBUG << "System Status (battery) packet";
+	  send_battery_packet(sys_status.voltage_battery / 1000.0,
+			      std::max(sys_status.current_battery, static_cast<short>(0)) / 100.0,
+			      3000, sys_status.battery_remaining);
 	  break;
 	case MAVLINK_MSG_ID_NAV_CONTROLLER_OUTPUT:
 	  mavlink_nav_controller_output_t nav;
@@ -248,9 +279,9 @@ void CRSFTelemetry::reader_thread() {
 	case MAVLINK_MSG_ID_ATTITUDE:
 	  mavlink_attitude_t att;
 	  mavlink_msg_attitude_decode(&msg, &att);
-	  create_attitude_packet(att.roll * 360.0 / M_PI,
-				 att.pitch * 360.0 / M_PI,
-				 att.yaw * 360.0 / M_PI);
+	  send_attitude_packet(att.roll * 360.0 / M_PI,
+			       att.pitch * 360.0 / M_PI,
+			       att.yaw * 360.0 / M_PI);
 	  break;
 	case MAVLINK_MSG_ID_STATUSTEXT:
 	  mavlink_statustext_t status;
@@ -279,6 +310,15 @@ void CRSFTelemetry::reader_thread() {
 	  set_value("mode", static_cast<float>(hb.custom_mode));
 	  heartbeat_received = true;
 	  LOG_DEBUG << "Heartbeat received\n";
+	  uint8_t rx_signal_quality = 90;
+	  uint8_t rx_snr = 8;
+	  uint8_t rf_mode = 0;
+	  uint8_t rx_antenna = 0;
+	  uint8_t tx_power = 2;
+	  uint8_t tx_signal_quality = 100;
+	  uint8_t tx_snr = 8;
+	  send_link_packet(-30, -50, rx_signal_quality, rx_snr, rx_antenna,
+			   rf_mode, tx_power, -20, tx_signal_quality, tx_snr);
 	  break;
 	}
 	case MAVLINK_MSG_ID_VFR_HUD:
@@ -290,9 +330,15 @@ void CRSFTelemetry::reader_thread() {
 	case MAVLINK_MSG_ID_SCALED_PRESSURE:
 	  //std::cerr << "Scaled Pressure " << std::endl;
 	  break;
-	case MAVLINK_MSG_ID_GPS_RAW_INT:
-	  //std::cerr << "GSP Raw " << std::endl;
+	case MAVLINK_MSG_ID_GPS_RAW_INT: {
+	  LOG_DEBUG << "GPS Raw";
+	  mavlink_gps_raw_int_t gps;
+	  mavlink_msg_gps_raw_int_decode(&msg, &gps);
+	  send_gps_packet(gps.lat, gps.lon,
+			  3600.0 * float(gps.vel) / 10000.0, // cm/s -> km/h / 10
+			  gps.cog, float(gps.alt) / 1000.0 + 1000, gps.satellites_visible);
 	  break;
+	}
 	case MAVLINK_MSG_ID_SYSTEM_TIME:
 	  //std::cerr << "System Time " << std::endl;
 	  break;
@@ -372,10 +418,10 @@ void CRSFTelemetry::reader_thread() {
   }
 }
 
-void CRSFTelemetry::status_thread() {
+void CRSFTelemetry::status_thread(uint16_t port) {
   boost::asio::io_service status_service;
   boost::asio::ip::udp::socket status_sock
-    (status_service, boost::asio::ip::udp::endpoint(boost::asio::ip::address_v4::any(), 5800));
+    (status_service, boost::asio::ip::udp::endpoint(boost::asio::ip::address_v4::any(), port));
   boost::asio::ip::udp::endpoint sender_endpoint;
 
   // Ensure we can receive broadcast messages.
@@ -421,21 +467,21 @@ void CRSFTelemetry::status_thread() {
     uint8_t tx_power = 2;
     uint8_t tx_signal_quality = 100;
     uint8_t tx_snr = 8;
-    create_link_packet(m_link_stats.adapter[0].current_signal_dbm,
-		       m_link_stats.adapter[1].current_signal_dbm,
-		       rx_signal_quality,
-		       rx_snr,
-		       rx_antenna,
-		       rf_mode,
-		       tx_power,
-		       m_link_stats.current_signal_joystick_uplink,
-		       tx_signal_quality,
-		       tx_snr);
+    send_link_packet(m_link_stats.adapter[0].current_signal_dbm,
+		     m_link_stats.adapter[1].current_signal_dbm,
+		     rx_signal_quality,
+		     rx_snr,
+		     rx_antenna,
+		     rf_mode,
+		     tx_power,
+		     m_link_stats.current_signal_joystick_uplink,
+		     tx_signal_quality,
+		     tx_snr);
     prev_link_stats = m_link_stats;
   }
 }
 
-void CRSFTelemetry::control_thread() {
+void CRSFTelemetry::control_thread(uint16_t port) {
   int max_length = 1024;
   uint8_t data[max_length];
   bool done = false;
@@ -443,7 +489,7 @@ void CRSFTelemetry::control_thread() {
   boost::asio::ip::udp::socket send_sock(send_service);
   send_sock.open(boost::asio::ip::udp::v4());
   send_sock.set_option(boost::asio::socket_base::broadcast(true));
-  boost::asio::ip::udp::endpoint sender_endpoint(boost::asio::ip::address_v4::any(), 14550);
+  boost::asio::ip::udp::endpoint sender_endpoint(boost::asio::ip::address_v4::any(), port);
 
   // Don't send anything until we've recieved a packet.
   while (!m_connected) {
