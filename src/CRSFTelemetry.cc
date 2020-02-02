@@ -379,7 +379,7 @@ void CRSFTelemetry::reader_thread(uint16_t port) {
 	  LOG_DEBUG << "Received packet: SYS: " << int(msg.sysid)
 		    << ", COMP: " << int(msg.compid)
 		    << ", LEN: " << int(msg.len)
-		    << ", MSG ID: " << msg.msgid << std::endl;
+		    << ", MSG ID: " << int(msg.msgid) << std::endl;
 	  break;
 	}
       }

@@ -199,8 +199,8 @@ void MSPTelemetry::udp_receive_loop() {
 	    break;
 	  }
 	  default:
-	    LOG_DEBUG << "Received packet: SYS: " << msg.sysid << " COMP: " << msg.compid
-		      << " LEN: " << msg.len << " MSG ID: " << msg.msgid;
+	    LOG_DEBUG << "Received packet: SYS: " << int(msg.sysid) << " COMP: " << int(msg.compid)
+		      << " LEN: " << int(msg.len) << " MSG ID: " << int(msg.msgid);
 	    break;
 	  }
 	}
