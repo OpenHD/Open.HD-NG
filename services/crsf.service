@@ -1,0 +1,13 @@
+[Unit]
+Description=TBS Crossfire Transmitter interface for OpenHD
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/crsf
+ExecStart=/usr/bin/crsf_receiver -c /etc/default/crsf
+TimeoutStopSec=5s
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=ground.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=MSP Telemetry processor for OpenHD
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/msp
+ExecStart=/usr/bin/msp_to_mavlink -c /etc/default/msp
+TimeoutStopSec=5s
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=air.target

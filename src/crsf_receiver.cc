@@ -122,12 +122,12 @@ int main(int argc, char **argv) {
      "change the UART to connect to (default=/dev/ttyS1)")
     ("baudrate,b", po::value<uint32_t>(&baudrate)->default_value(115200),
      "set the baudrate for the uart (default=115200)")
-    ("recv_port", po::value<uint16_t>(&recv_port)->default_value(14551),
-     "set the UDP port to receive telemetry packets to (default=14551)")
+    ("recv_port", po::value<uint16_t>(&recv_port)->default_value(14550),
+     "set the UDP port to receive telemetry packets to (default=14550)")
     ("status_port", po::value<uint16_t>(&status_port)->default_value(5800),
      "set the UDP port to receive status packets to (default=5800)")
-    ("send_port", po::value<uint16_t>(&send_port)->default_value(14550),
-     "set the UDP port to send the packets to (default=14550)")
+    ("send_port", po::value<uint16_t>(&send_port)->default_value(14551),
+     "set the UDP port to send the packets to (default=14551)")
     ;
 
   // Declare the various combinations of options.

@@ -98,11 +98,14 @@ target_link_libraries(crsf_receiver ${Boost_LIBRARIES} pthread)
 
 # Install the configuration files
 install(FILES "${PROJECT_SOURCE_DIR}/conf/openhd" DESTINATION etc/default COMPONENT configuratios)
+install(FILES "${PROJECT_SOURCE_DIR}/conf/msp" DESTINATION etc/default COMPONENT configuratios)
+install(FILES "${PROJECT_SOURCE_DIR}/conf/crsf" DESTINATION etc/default COMPONENT configuratios)
 
 # Install the service files
 install(FILES "${PROJECT_SOURCE_DIR}/services/openhd.service" DESTINATION lib/systemd/system COMPONENT configuratios)
 install(FILES "${PROJECT_SOURCE_DIR}/services/camera.service" DESTINATION lib/systemd/system COMPONENT configuratios)
-install(FILES "${PROJECT_SOURCE_DIR}/services/telemetry.service" DESTINATION lib/systemd/system COMPONENT configuratios)
+install(FILES "${PROJECT_SOURCE_DIR}/services/msp.service" DESTINATION lib/systemd/system COMPONENT configuratios)
+install(FILES "${PROJECT_SOURCE_DIR}/services/crsf.service" DESTINATION lib/systemd/system COMPONENT configuratios)
 install(FILES "${PROJECT_SOURCE_DIR}/services/air.target" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/ground.target" DESTINATION lib/systemd/system COMPONENT configuration)
 
