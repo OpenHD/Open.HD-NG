@@ -103,8 +103,8 @@ install(FILES "${PROJECT_SOURCE_DIR}/conf/openhd" DESTINATION etc/default COMPON
 install(FILES "${PROJECT_SOURCE_DIR}/services/openhd.service" DESTINATION lib/systemd/system COMPONENT configuratios)
 install(FILES "${PROJECT_SOURCE_DIR}/services/camera.service" DESTINATION lib/systemd/system COMPONENT configuratios)
 install(FILES "${PROJECT_SOURCE_DIR}/services/telemetry.service" DESTINATION lib/systemd/system COMPONENT configuratios)
-install(FILES "${PROJECT_SOURCE_DIR}/services/air.target" DESTINATION lib/systemd/system COMPONENT configuration)
-install(FILES "${PROJECT_SOURCE_DIR}/services/ground.target" DESTINATION lib/systemd/system COMPONENT configuration)
+#install(FILES "${PROJECT_SOURCE_DIR}/services/air.target" DESTINATION lib/systemd/system COMPONENT configuration)
+#install(FILES "${PROJECT_SOURCE_DIR}/services/ground.target" DESTINATION lib/systemd/system COMPONENT configuration)
 
 # Add uninstall target
 add_custom_target(uninstall "${CMAKE_COMMAND}" -P "${CMAKE_MODULE_PATH}/uninstall.cmake")
