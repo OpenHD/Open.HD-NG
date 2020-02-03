@@ -3,4 +3,3 @@
 # Default to ground mode
 systemctl enable /lib/systemd/system/openhd.service
 systemctl enable /lib/systemd/system/camera.service
-systemctl enable /lib/systemd/system/telemetry.service
