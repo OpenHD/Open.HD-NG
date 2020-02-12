@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(Open.HD-NG)
 
-set(VERSION "0.9.7")
+set(VERSION "0.9.8")
 
 # Point to our local cmake files
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
@@ -97,15 +97,15 @@ install(TARGETS crsf_receiver DESTINATION ${BinDir} COMPONENT applications)
 target_link_libraries(crsf_receiver ${Boost_LIBRARIES} pthread)
 
 # Install the configuration files
-install(FILES "${PROJECT_SOURCE_DIR}/conf/openhd" DESTINATION etc/default COMPONENT configuratios)
-install(FILES "${PROJECT_SOURCE_DIR}/conf/msp" DESTINATION etc/default COMPONENT configuratios)
-install(FILES "${PROJECT_SOURCE_DIR}/conf/crsf" DESTINATION etc/default COMPONENT configuratios)
+install(FILES "${PROJECT_SOURCE_DIR}/conf/openhd" DESTINATION etc/default COMPONENT configuration)
+install(FILES "${PROJECT_SOURCE_DIR}/conf/msp" DESTINATION etc/default COMPONENT configuration)
+install(FILES "${PROJECT_SOURCE_DIR}/conf/crsf" DESTINATION etc/default COMPONENT configuration)
 
 # Install the service files
-install(FILES "${PROJECT_SOURCE_DIR}/services/openhd.service" DESTINATION lib/systemd/system COMPONENT configuratios)
-install(FILES "${PROJECT_SOURCE_DIR}/services/camera.service" DESTINATION lib/systemd/system COMPONENT configuratios)
-install(FILES "${PROJECT_SOURCE_DIR}/services/msp.service" DESTINATION lib/systemd/system COMPONENT configuratios)
-install(FILES "${PROJECT_SOURCE_DIR}/services/crsf.service" DESTINATION lib/systemd/system COMPONENT configuratios)
+install(FILES "${PROJECT_SOURCE_DIR}/services/openhd.service" DESTINATION lib/systemd/system COMPONENT configuration)
+install(FILES "${PROJECT_SOURCE_DIR}/services/camera.service" DESTINATION lib/systemd/system COMPONENT configuration)
+install(FILES "${PROJECT_SOURCE_DIR}/services/msp.service" DESTINATION lib/systemd/system COMPONENT configuration)
+install(FILES "${PROJECT_SOURCE_DIR}/services/crsf.service" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/air.target" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/ground.target" DESTINATION lib/systemd/system COMPONENT configuration)
 

@@ -234,7 +234,7 @@ void CRSFTelemetry::reader_thread(uint16_t port) {
   bool messages_requested = false;
   boost::asio::io_service recv_service;
   boost::asio::ip::udp::socket recv_sock
-    (recv_service, boost::asio::ip::udp::endpoint(boost::asio::ip::address_v4::any(), 14551));
+    (recv_service, boost::asio::ip::udp::endpoint(boost::asio::ip::address_v4::any(), port));
   boost::asio::ip::udp::endpoint sender_endpoint;
 
   recv_sock.set_option(boost::asio::socket_base::broadcast(true));
