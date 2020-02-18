@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(Open.HD-NG)
 
-set(VERSION "0.9.9")
+set(VERSION "0.9.10")
 
 # Point to our local cmake files
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
@@ -113,7 +113,7 @@ install(FILES "${PROJECT_SOURCE_DIR}/services/ground.target" DESTINATION lib/sys
 add_custom_target(uninstall "${CMAKE_COMMAND}" -P "${CMAKE_MODULE_PATH}/uninstall.cmake")
 
 # Add the debian debian package dependencies
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libboost-all-dev,cython3,libv4l-dev")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libboost-all-dev,cython3,libv4l-dev,python3-numpy")
 
 # Add rules to build a debian package
 set(CPACK_GENERATOR "DEB")
