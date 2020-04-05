@@ -43,6 +43,19 @@ Add `sudo` if you're installing in the system directories and not already runnin
 make install
 ~~~
 
+### Install into system directories
+
+~~~
+cmake -DCMAKE_INSTALL_PREFIX=/ ..
+sudo make install
+~~~
+
+### Activate system services (after intalling in root)
+
+~~~
+sudo ../scripts/postinst
+~~~
+
 ### Create a debian package
 
 ~~~

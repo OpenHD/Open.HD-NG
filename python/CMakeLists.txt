@@ -23,17 +23,18 @@ target_link_libraries(fec ${PYTHON_LIBRARY} ${Extra_Libraries} wifibroadcast)
 cython_add_module(py_v4l2)
 target_link_libraries(py_v4l2 ${PYTHON_LIBRARY} ${Extra_Libraries} v4l2)
 
-# Build the py_mavlink cython interface
-cython_add_module(py_mavlink)
-target_link_libraries(py_mavlink ${PYTHON_LIBRARY} ${Extra_Libraries})
+# Build the mavlink cython interface
+cython_add_module(mavlink)
+target_link_libraries(mavlink ${PYTHON_LIBRARY} ${Extra_Libraries})
 
 # Install the cython targets.
-install(TARGETS fec py_v4l2 py_mavlink DESTINATION ${RELATIVE_PYTHON_DIR})
+install(TARGETS fec py_v4l2 mavlink DESTINATION ${RELATIVE_PYTHON_DIR})
 
 # Install the python executable scripts
 install(PROGRAMS openhd_camera DESTINATION ${BinDir})
 install(PROGRAMS openhd_telemetry DESTINATION ${BinDir})
 install(PROGRAMS openhd_controller DESTINATION ${BinDir})
+install(PROGRAMS openhd_mavlink_air DESTINATION ${BinDir})
 
 # Install the python libraries
 install(FILES

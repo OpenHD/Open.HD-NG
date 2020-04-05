@@ -25,10 +25,12 @@ intra_period_secondary = 5
 prefer_picam_secondary = 1
 video_blocksize_secondary = 1400
 fec_ratio_secondary = 0.0
-telemetry_uart = /dev/ttyS1
-telemetry_baudrate = 115200
-telemetry_protocol = mavlink
-telemetry_host = 127.0.0.1
-telemetry_port = 14550
+
+[air_telemetry]
+uart = /dev/ttyS1
+baudrate = 57600
+protocol = mavlink
+host = 127.0.0.1
+port = 14650
 rc_host = 127.0.0.1
-rc_port = 14551
+rc_port = 14651
