@@ -7,7 +7,9 @@ find_package(PythonLibs REQUIRED)
 include_directories(
   ${PYTHON_INCLUDE_PATH}
   ${PROJECT_SOURCE_DIR}/python
-  ${WFB_INCLUDE_DIR}/wifibroadcast)
+  ${WFB_INCLUDE_DIR}/wifibroadcast
+  ${PROJECT_SOURCE_DIR}/modules
+  )
 
 # Compile with cython
 include(UseCython)
@@ -19,10 +21,14 @@ target_link_libraries(fec ${PYTHON_LIBRARY} ${Extra_Libraries} wifibroadcast)
 
 # Build the py_v4l2 cython interface
 cython_add_module(py_v4l2)
-target_link_libraries(py_v4l2  ${PYTHON_LIBRARY} ${Extra_Libraries} v4l2)
+target_link_libraries(py_v4l2 ${PYTHON_LIBRARY} ${Extra_Libraries} v4l2)
+
+# Build the py_mavlink cython interface
+cython_add_module(py_mavlink)
+target_link_libraries(py_mavlink ${PYTHON_LIBRARY} ${Extra_Libraries})
 
 # Install the cython targets.
-install(TARGETS fec py_v4l2 DESTINATION ${RELATIVE_PYTHON_DIR})
+install(TARGETS fec py_v4l2 py_mavlink DESTINATION ${RELATIVE_PYTHON_DIR})
 
 # Install the python executable scripts
 install(PROGRAMS openhd_camera DESTINATION ${BinDir})
