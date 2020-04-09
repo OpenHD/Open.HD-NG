@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import time
+import signal
+import logging
+import logging.handlers
+import configparser
+
+from openhd import mavlink as mav
+
+# The first and only argument should be the component config file.
+if len(sys.argv) != 2 or not os.path.isfile(sys.argv[1]):
+    sys.stderr.write("Usage: " + sys.argv[0] + " <config file>\n")
+    exit(1)
+config_filename = sys.argv[1]
+
+# Read the config file
+config = configparser.ConfigParser()
+config['global'] = {
+    'log_level': 'critical',
+    'syslog_level': 'info',
+}
+try:
+    config.read(config_filename)
+except:
+    print("Error reading the configuration file: " + config_filename)
+    exit
+
+# Configure the logger
+log_level = getattr(logging, config['global'].get('log_level').upper())
+syslog_level = getattr(logging, config['global'].get('syslog_level').upper())
+if not isinstance(log_level, int):
+    print("Invalid log level: %s - setting to info" % (args.log_level))
+    log_level = logging.INFO
+if not isinstance(syslog_level, int):
+    print("Invalid syslog level: %s - setting to info" % (args.syslog_level))
+    syslog_level = logging.INFO
+logger = logging.getLogger('wifi_config')
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(log_level)
+syslog_handler = logging.handlers.SysLogHandler(address = "/dev/log")
+syslog_handler.setLevel(syslog_level)
+logging.basicConfig(level=min(log_level, syslog_level), format="%(asctime)s %(levelname)s: %(message)s",
+                    datefmt="%H:%M:%S", handlers = [stream_handler, syslog_handler])
+
+handlers = []
+
+# Configure a signal handler to exit cleanly
+terminate = False
+def handler(signal_received, frame):
+    global terminate
+    terminate = True
+    for h in handlers:
+        h.terminate()
+    router.terminate()
+
+if __name__ == '__main__':
+
+    # Retrieve the configuration parameters
+    uart = config['air_telemetry'].get('uart')
+    baudrate = int(config['air_telemetry'].get('baudrate'))
+    local_host = config['air_telemetry'].get('rc_host')
+    local_port = int(config['air_telemetry'].get('rc_port'))
+    target_host = config['air_telemetry'].get('host')
+    target_port = int(config['air_telemetry'].get('port'))
+    uart = '/dev/ttyS3'
+    baudrate = 115200
+    local_host = '0.0.0.0'
+    local_port = 14550
+    target_host = '10.1.1.255'
+    target_port = 14551
+
+    # Setup the exit signal handler
+    signal.signal(signal.SIGINT, handler)
+
+    # Create the mavlink router
+    router = mav.Router()
+
+    # Create the connection to the transmitter
+    logging.debug("Connecting to UART: %s:%d" % (uart, baudrate))
+    serial_end = mav.SerialEndpoint(router.get_queue(), uart, baudrate)
+    router.add_endpoint(serial_end)
+    handlers.append(serial_end)
+
+    # Create the connection to the skyviper
+    logging.debug("Creating UDP interface (%s:%d) to (%s:%d)" % (local_host, local_port, target_host, target_port))
+    sky_end = mav.UDPEndpoint(router.get_queue(), local_host, local_port, target_host, target_port)
+    router.add_endpoint(sky_end)
+    handlers.append(sky_end)
+    
+    # Create the connection that can be used to connect to a standard GCS
+    gcs_end = mav.UDPEndpoint(router.get_queue(), '0.0.0.0', 14561, '10.1.1.255', 14560)
+    router.add_endpoint(gcs_end)
+    handlers.append(gcs_end)
+
+    # We need to fill in dummy radio status messages to satisfy the Tx that it has a connection
+    while not terminate:
+        if sky_end.sysid != 0:
+            msg = mav.RadioStatusMsg(sky_end.sysid, 1, 50, 55, 100, 1, 2, 0, 0)
+            router.put_queue(msg)
+        time.sleep(0.25)
+
+    router.join()
+    exit(0)

@@ -4,6 +4,7 @@ import socket
 import threading
 import select
 import queue
+import logging
 
 from libc.errno cimport errno, EINTR, EINVAL
 from libc.string cimport memset, memcpy, strerror
@@ -77,10 +78,31 @@ cdef extern from 'mavlink/protocol.h':
     cdef uint16_t mavlink_msg_get_send_buffer_length(mavlink_message_t* msg)
     cdef uint16_t mavlink_msg_to_send_buffer(uint8_t *buffer, mavlink_message_t *msg)
 
+cdef extern from 'mavlink/common/mavlink_msg_radio_status.h':
+    cdef struct __mavlink_radio_status_t:
+        uint16_t rxerrors
+        uint16_t fixed
+        uint8_t rssi
+        uint8_t remrssi
+        uint8_t txbuf
+        uint8_t noise
+        uint8_t remnoise
+    ctypedef __mavlink_radio_status_t mavlink_radio_status_t
+    cdef uint16_t mavlink_msg_radio_status_pack(uint8_t system_id, uint8_t component_id,
+                                                mavlink_message_t* msg,
+                                                uint8_t rssi, uint8_t remrssi, uint8_t txbuf,
+                                                uint8_t noise, uint8_t remnoise, uint16_t rxerrors,
+                                                uint16_t fixed)
+    cdef uint16_t mavlink_msg_radio_status_encode(uint8_t system_id, uint8_t component_id,
+                                                  mavlink_message_t* msg, const mavlink_radio_status_t* radio_status)
 
 cdef class MavlinkMsg:
     cdef mavlink_message_t m_msg
     cdef mavlink_status_t m_status
+
+    def __init__(self, sysid=1, compid=1):
+        self.m_msg.sysid = sysid
+        self.m_msg.compid = compid
 
     def len(self):
         return self.m_msg.len
@@ -88,14 +110,14 @@ cdef class MavlinkMsg:
     def seq(self):
         return self.m_msg.seq
 
+    def msgid(self):
+        return self.m_msg.msgid
+
     def sysid(self):
         return self.m_msg.sysid
 
     def compid(self):
         return self.m_msg.compid
-
-    def msgid(self):
-        return self.m_msg.msgid
 
     def parse_ch(self, c):
         if mavlink_parse_char(MAVLINK_COMM_0, c, &self.m_msg, &self.m_status) != 0:
@@ -111,10 +133,25 @@ cdef class MavlinkMsg:
         mavlink_msg_to_send_buffer(arr, &self.m_msg)
         return arr
 
+cdef class RadioStatusMsg(MavlinkMsg):
+
+    def __init__(self, sysid, compid, rssi, remrssi, txbuf, noise, remnoise, rxerrors, fixed):
+        super().__init__(sysid, compid)
+        mavlink_msg_radio_status_pack(sysid, compid, &self.m_msg, rssi, remrssi, txbuf,
+                                      noise, remnoise, rxerrors, fixed)
+
 class Mavlink:
 
-    def __init__(self):
+    def __init__(self, sysid=0, compid=0):
         self.m_msg = MavlinkMsg()
+        self.sysid = sysid
+        self.compid = compid
+
+    def get_sysid(self):
+        return self.sysid
+
+    def compid(self):
+        return self.comp_id
 
     def parse_ch(self, uint8_t c):
         if self.m_msg.parse_char(c):
@@ -139,6 +176,7 @@ class SerialEndpoint:
         self.mav = Mavlink()
         self.out_queue = out_queue
         self.send_queue = queue.Queue(maxsize=max_queue_size)
+        self.uart = uart
         self.ser = serial.Serial(uart, baudrate, timeout=timeout)
         self.blocksize = blocksize
         self.sysid = 0
@@ -149,9 +187,6 @@ class SerialEndpoint:
         self.reader.start()
         self.writer = threading.Thread(target=self.write_thread)
         self.writer.start()
-
-    def get_sysid(self):
-        return self.sysid
 
     def queue_msg(self, msg):
         self.send_queue.put(msg)
@@ -164,10 +199,17 @@ class SerialEndpoint:
 
     def read_thread(self):
         while self.running:
-            buf = self.ser.read(self.blocksize)
+            try:
+                buf = self.ser.read(self.blocksize)
+            except:
+                buf = None
             for msg in self.mav.parse_buf(buf):
                 if msg is not None:
-                    self.sysid = msg.sysid()
+                    logging.debug("Read message from UART: %s of length %d" % (self.uart, msg.len()))
+                    if self.sysid != msg.sysid():
+                        self.sysid = msg.sysid()
+                        logging.info("New connection from id: %d on UART: %s",
+                                     msg.sysid(), self.uart)
                     self.out_queue.put(msg)
 
     def write_thread(self):
@@ -186,6 +228,8 @@ class UDPEndpoint:
         self.mav = Mavlink()
         self.out_queue = out_queue
         self.send_queue = queue.Queue(maxsize=max_queue_size)
+        self.source_host = source_host
+        self.source_port = source_port
         self.target_host = target_host
         self.target_port = target_port
         self.sysid = 0
@@ -193,6 +237,7 @@ class UDPEndpoint:
         # Create and initialize the socket
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((source_host, source_port))
+        logging.debug("Binding to: %s:%d" % (source_host, source_port))
         self.sock.setblocking(0)
 
         # Start the reader and writer threads
@@ -201,9 +246,6 @@ class UDPEndpoint:
         self.reader.start()
         self.writer = threading.Thread(target=self.write_thread)
         self.writer.start()
-
-    def get_sysid(self):
-        return self.sysid
 
     def queue_msg(self, msg):
         self.send_queue.put(msg)
@@ -219,9 +261,13 @@ class UDPEndpoint:
             ready = select.select([self.sock], [], [], 1)
             if ready[0]:
                 data, addr = self.sock.recvfrom(1024)
+                logging.debug("Received patcket: (length=%d)" % (len(data)))
                 for msg in self.mav.parse_buf(data):
                     if msg is not None:
-                        self.sysid = msg.sysid()
+                        if self.sysid != msg.sysid():
+                            self.sysid = msg.sysid()
+                            logging.info("New connection from id: %d on UDP (%s:%d)",
+                                         msg.sysid(), self.source_host, self.source_port)
                         self.out_queue.put(msg)
 
     def write_thread(self):
@@ -252,6 +298,9 @@ class Router:
     def get_queue(self):
         return self.queue
 
+    def put_queue(self, msg):
+        self.queue.put(msg)
+
     def add_endpoint(self, endpoint):
         self.endpoints.append(endpoint)
 
@@ -268,5 +317,5 @@ class Router:
     def route_message(self, msg):
         # At this point we will just broadcast all messages to everyone but the sender.
         for ep in self.endpoints:
-            if ep.get_sysid() != msg.sysid():
+            if ep.sysid != msg.sysid:
                 ep.queue_msg(msg)

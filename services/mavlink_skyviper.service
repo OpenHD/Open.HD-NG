@@ -1,0 +1,13 @@
+[Unit]
+Description=Air-side Mavlink Telemetry processor for OpenHD
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/openhd
+ExecStart=/usr/bin/openhd_mavlink_skyviper /etc/default/openhd
+TimeoutStopSec=5s
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=ground.target

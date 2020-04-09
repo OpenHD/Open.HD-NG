@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(Open.HD-NG)
 
-set(VERSION "0.9.11")
+set(VERSION "0.9.12")
 
 # Point to our local cmake files
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
@@ -108,6 +108,7 @@ install(FILES "${PROJECT_SOURCE_DIR}/services/camera.service" DESTINATION lib/sy
 install(FILES "${PROJECT_SOURCE_DIR}/services/msp.service" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/crsf.service" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/mavlink_air.service" DESTINATION lib/systemd/system COMPONENT configuration)
+install(FILES "${PROJECT_SOURCE_DIR}/services/mavlink_skyviper.service" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/air.target" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/ground.target" DESTINATION lib/systemd/system COMPONENT configuration)
 

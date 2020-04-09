@@ -26,9 +26,18 @@ prefer_picam_secondary = 1
 video_blocksize_secondary = 1400
 fec_ratio_secondary = 0.0
 
+[ground_telemetry]
+uart = /dev/ttyS3
+baudrate = 115200
+protocol = mavlink
+host = 127.0.0.1
+port = 14650
+rc_host = 127.0.0.1
+rc_port = 14651
+
 [air_telemetry]
 uart = /dev/ttyS1
-baudrate = 57600
+baudrate = 115200
 protocol = mavlink
 host = 127.0.0.1
 port = 14650
