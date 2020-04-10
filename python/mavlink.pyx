@@ -220,25 +220,44 @@ class SerialEndpoint:
             except:
                 pass # Timeout?
 
-class UDPEndpoint:
+class UDPEndpoint(object):
     
-    def __init__(self, out_queue, source_host, source_port, target_host, target_port,
+    def __init__(self, out_queue, local_host, local_port, target_host, target_port,
                  bufsize=1024, max_queue_size=100):
         threading.Thread.__init__(self)
         self.mav = Mavlink()
         self.out_queue = out_queue
         self.send_queue = queue.Queue(maxsize=max_queue_size)
-        self.source_host = source_host
-        self.source_port = source_port
+        self.local_host = local_host
+        self.local_port = int(local_port)
         self.target_host = target_host
-        self.target_port = target_port
+        self.target_port = int(target_port)
         self.sysid = 0
 
-        # Create and initialize the socket
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind((source_host, source_port))
-        logging.debug("Binding to: %s:%d" % (source_host, source_port))
-        self.sock.setblocking(0)
+        # Create and initialize the socket as required
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+
+        # Default the socket to broadcast
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+        # If a local port wasn't specified, find one that's available
+        if self.local_port == 0:
+            self.local_port = self.target_port + 1
+            while True:
+                try:
+                    self.sock.bind((self.local_host, self.local_port))
+                except:
+                    continue
+                break
+        else:
+            try:
+                self.sock.bind((self.local_host, self.local_port))
+            except:
+                logging.fatal("Error binding to local port: (%s:%d)" % \
+                              (self.local_host, self.local_port))
+            self.sock.setblocking(0)
+        logging.debug("Bound to: %s:%d" % (self.local_host, self.local_port))
 
         # Start the reader and writer threads
         self.running = True
@@ -257,26 +276,72 @@ class UDPEndpoint:
         self.running = False
 
     def read_thread(self):
+
         while self.running:
+
+            # Wait until a message is received so we don't block for too long
             ready = select.select([self.sock], [], [], 1)
             if ready[0]:
+
+                # Receive the message
                 data, addr = self.sock.recvfrom(1024)
                 logging.debug("Received patcket: (length=%d)" % (len(data)))
+
+                # Parse the message
                 for msg in self.mav.parse_buf(data):
+
+                    # Relay the message
                     if msg is not None:
+
+                        # Is this a new connection?
                         if self.sysid != msg.sysid():
                             self.sysid = msg.sysid()
-                            logging.info("New connection from id: %d on UDP (%s:%d)",
-                                         msg.sysid(), self.source_host, self.source_port)
+                            logging.info("New connection from id: %d on UDP (%s:%d) from UDP (%s:%d)",
+                                         msg.sysid(), self.local_host, self.local_port, addr[0], addr[1])
+
+                            # We should ensure that we're sending to that host
+                            self.target_host = addr[0]
+                            self.target_port = addr[1]
+
+                            # Turn off socket
+                            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 0)
+
+                        # Pass on the message to the router
                         self.out_queue.put(msg)
 
     def write_thread(self):
         while self.running:
             try:
                 msg = self.send_queue.get(timeout=1)
-                self.sock.sendto(msg.serialize(), (self.target_host, self.target_port))
+                if self.target_host != '' and self.target_port > 0:
+                    buf = msg.serialize()
+                    logging.debug("Sending message of length %d to (%s:%d)",
+                                  len(buf), self.target_host, self.target_port)
+                    self.sock.sendto(buf, (self.target_host, self.target_port))
             except:
                 pass # Timeout?
+
+
+class UDPSource(UDPEndpoint):
+    '''
+    A UDP endpoint that broadcasts to the specified port until a response
+    message is received, then it switches to sending directly to the host/ip
+    of the sender
+    '''
+
+    def __init__(self, out_queue, source_port, bufsize=1024, max_queue_size=100):
+        super().__init__(out_queue, '0.0.0.0', 0, '<broadcast>', source_port)
+
+
+class UDPSink(UDPEndpoint):
+    '''
+    A UDP endpoint that waits to receive a message on the specified port, then
+    uses the address of the received message to communicate back with the sender
+    '''
+
+    def __init__(self, out_queue, sink_port, sink_host='0.0.0.0', bufsize=1024, max_queue_size=100):
+        super().__init__(out_queue, sink_host, sink_port, '', 0)
+
 
 class Router:
 
