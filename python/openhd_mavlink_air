@@ -57,9 +57,9 @@ if __name__ == '__main__':
     # Retrieve the configuration parameters
     uart = config['air_telemetry'].get('uart')
     baudrate = int(config['air_telemetry'].get('baudrate'))
-    local_host = config['air_telemetry'].get('rc_host')
+    local_host = str(config['air_telemetry'].get('rc_host'))
     local_port = int(config['air_telemetry'].get('rc_port'))
-    target_host = config['air_telemetry'].get('host')
+    target_host = str(config['air_telemetry'].get('host'))
     target_port = int(config['air_telemetry'].get('port'))
 
     # Setup the exit signal handler
@@ -77,11 +77,11 @@ if __name__ == '__main__':
     wfb_end = mav.UDPEndpoint(router.get_queue(), local_host, local_port, target_host, target_port)
     router.add_endpoint(wfb_end)
     handlers.append(wfb_end)
-    
-    # Create the connection that can be used to connect to a standard GCS
-    gcs_end = mav.UDPEndpoint(router.get_queue(), '0.0.0.0', 14551, '192.168.10.1', 14550)
-    router.add_endpoint(gcs_end)
-    handlers.append(gcs_end)
+
+    # Create the connection to a standard GCS link
+    wfb_end = mav.UDPSource(router.get_queue(), 14550)
+    router.add_endpoint(wfb_end)
+    handlers.append(wfb_end)
 
     router.join()
     exit(0)
