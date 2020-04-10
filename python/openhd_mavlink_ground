@@ -56,23 +56,18 @@ if __name__ == '__main__':
 
     # Retrieve the configuration parameters
     uart = config['ground_telemetry'].get('uart')
-    baudrate = int(config['air_telemetry'].get('baudrate'))
-    local_host = config['air_telemetry'].get('host')
-    local_port = int(config['air_telemetry'].get('port'))
-    target_host = config['air_telemetry'].get('rc_host')
-    target_port = int(config['air_telemetry'].get('rc_port'))
+    baudrate = int(config['ground_telemetry'].get('baudrate'))
+    local_host = config['ground_telemetry'].get('host')
+    local_port = int(config['ground_telemetry'].get('port'))
+    target_host = config['ground_telemetry'].get('rc_host')
+    target_port = int(config['ground_telemetry'].get('rc_port'))
+    gcs_port = int(config['ground_telemetry'].get('gcs_port'))
 
     # Setup the exit signal handler
     signal.signal(signal.SIGINT, handler)
 
     # Create the mavlink router
     router = mav.Router()
-
-    # Create the connection to the transmitter
-    logging.debug("Connecting to UART: %s:%d" % (uart, baudrate))
-    serial_end = mav.SerialEndpoint(router.get_queue(), uart, baudrate)
-    router.add_endpoint(serial_end)
-    handlers.append(serial_end)
 
     # Create the connection to the wifibroadcast link
     logging.debug("Creating UDP interface (%s:%d) to (%s:%d)" % (local_host, local_port, target_host, target_port))
@@ -81,7 +76,8 @@ if __name__ == '__main__':
     handlers.append(wfb_end)
     
     # Create the connection that can be used to connect to a standard GCS
-    gcs_end = mav.UDPEndpoint(router.get_queue(), '0.0.0.0', 14551, '192.168.10.1', 14550)
+    logging.debug("Creating GCS-type UDP interface on port %d" % (int(gcs_port)))
+    gcs_end = mav.UDPSource(router.get_queue(), gcs_port)
     router.add_endpoint(gcs_end)
     handlers.append(gcs_end)
 
