@@ -1,0 +1,13 @@
+[Unit]
+Description=Mavlink Telemetry processor for OpenHD on a Transmitter
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/openhd
+ExecStart=/usr/bin/openhd_mavlink_transmitter /etc/default/openhd
+TimeoutStopSec=5s
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=ground.target
