@@ -51,7 +51,6 @@ handlers = []
 def handler(signal_received, frame):
     for h in handlers:
         h.terminate()
-    router.terminate()
 
 if __name__ == '__main__':
 
@@ -63,20 +62,21 @@ if __name__ == '__main__':
     # Setup the exit signal handler
     signal.signal(signal.SIGINT, handler)
 
-    # Create the mavlink router
-    router = mav.Router()
-
     # Create the connection to the transmitter
     logging.debug("Connecting to UART: %s:%d" % (uart, baudrate))
-    serial_end = mav.SerialEndpoint(router.get_queue(), uart, baudrate)
-    router.add_endpoint(serial_end)
+    serial_end = mav.SerialEndpoint("TX", uart, baudrate)
     handlers.append(serial_end)
 
     # Create the GCS-style connection that the Tx needs
     logging.debug("Creating GCS-type UDP interface on port %d" % (int(port)))
-    tx_end = mav.UDPSink(router.get_queue(), port)
-    router.add_endpoint(tx_end)
-    handlers.append(tx_end)
+    gcs_end = mav.UDPSink("GCS", port)
+    handlers.append(gcs_end)
 
-    router.join()
+    # Create the routeing links
+    serial_end.add_route(gcs_end)
+    gcs_end.add_route(serial_end)
+
+    # Wait for the endpoints to shutdown then exit
+    for h in handlers:
+        h.join()
     exit(0)

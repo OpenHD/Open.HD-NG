@@ -37,7 +37,6 @@ install(PROGRAMS openhd_controller DESTINATION ${BinDir})
 install(PROGRAMS openhd_mavlink_air DESTINATION ${BinDir})
 install(PROGRAMS openhd_mavlink_ground DESTINATION ${BinDir})
 install(PROGRAMS openhd_mavlink_transmitter DESTINATION ${BinDir})
-install(PROGRAMS openhd_mavlink_skyviper DESTINATION ${BinDir})
 
 # Install the python libraries
 install(FILES

@@ -27,8 +27,6 @@ video_blocksize_secondary = 1400
 fec_ratio_secondary = 0.0
 
 [ground_telemetry]
-uart = /dev/ttyS3
-baudrate = 115200
 protocol = mavlink
 host = 127.0.0.1
 port = 14650
@@ -45,6 +43,7 @@ host = 127.0.0.1
 port = 14650
 rc_host = 127.0.0.1
 rc_port = 14651
+gcs_port = 14550
 
 [transmitter_telemetry]
 protocol = mavlink

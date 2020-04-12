@@ -50,14 +50,11 @@ def handler(signal_received, frame):
     '''A signal handler to that will initiate a clean shutdown of the script'''
     for h in handlers:
         h.terminate()
-    router.terminate()
 
 
 if __name__ == '__main__':
 
     # Retrieve the configuration parameters
-    uart = config['ground_telemetry'].get('uart')
-    baudrate = int(config['ground_telemetry'].get('baudrate'))
     local_host = config['ground_telemetry'].get('host')
     local_port = int(config['ground_telemetry'].get('port'))
     target_host = config['ground_telemetry'].get('rc_host')
@@ -68,26 +65,27 @@ if __name__ == '__main__':
     # Setup the exit signal handler
     signal.signal(signal.SIGINT, handler)
 
-    # Create the mavlink router
-    router = mav.Router()
-
     # Create the connection to the wifibroadcast link
     logging.debug("Creating UDP interface (%s:%d) to (%s:%d)" % (local_host, local_port, target_host, target_port))
-    wfb_end = mav.UDPEndpoint(router.get_queue(), local_host, local_port, target_host, target_port)
-    router.add_endpoint(wfb_end)
+    wfb_end = mav.UDPEndpoint("WFB", local_host, local_port, target_host, target_port)
     handlers.append(wfb_end)
 
     # Create the connection to receive wifibroadcast status on
     logging.debug("Receiving wifibroadcast status on %d" % (status_port))
-    status_end = mav.WFBStatusEndpoint(router.get_queue(), port=status_port)
-    router.add_endpoint(status_end)
+    status_end = mav.WFBStatusEndpoint("Status", port=status_port)
     handlers.append(status_end)
     
     # Create the connection that can be used to connect to a standard GCS
     logging.debug("Creating GCS-type UDP interface on port %d" % (int(gcs_port)))
-    gcs_end = mav.UDPSource(router.get_queue(), gcs_port)
-    router.add_endpoint(gcs_end)
+    gcs_end = mav.UDPSource("GCS", gcs_port)
     handlers.append(gcs_end)
 
-    router.join()
+    # Create the routeing links
+    wfb_end.add_route(gcs_end)
+    status_end.add_route(gcs_end)
+    gcs_end.add_route(wfb_end)
+
+    # Wait for the endpoints to shutdown then exit
+    for h in handlers:
+        h.join()
     exit(0)

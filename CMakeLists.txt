@@ -109,7 +109,6 @@ install(FILES "${PROJECT_SOURCE_DIR}/services/crsf.service" DESTINATION lib/syst
 install(FILES "${PROJECT_SOURCE_DIR}/services/mavlink_air.service" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/mavlink_ground.service" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/mavlink_transmitter.service" DESTINATION lib/systemd/system COMPONENT configuration)
-install(FILES "${PROJECT_SOURCE_DIR}/services/mavlink_skyviper.service" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/air.target" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/ground.target" DESTINATION lib/systemd/system COMPONENT configuration)
 

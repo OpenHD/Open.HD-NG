@@ -50,7 +50,6 @@ handlers = []
 def handler(signal_received, frame):
     for h in handlers:
         h.terminate()
-    router.terminate()
 
 if __name__ == '__main__':
 
@@ -61,27 +60,33 @@ if __name__ == '__main__':
     local_port = int(config['air_telemetry'].get('rc_port'))
     target_host = str(config['air_telemetry'].get('host'))
     target_port = int(config['air_telemetry'].get('port'))
+    gcs_port = int(config['air_telemetry'].get('gcs_port'))
 
     # Setup the exit signal handler
     signal.signal(signal.SIGINT, handler)
 
-    # Create the mavlink router
-    router = mav.Router()
-
     # Create the connection to the flight controller
-    serial_end = mav.SerialEndpoint(router.get_queue(), uart, baudrate)
-    router.add_endpoint(serial_end)
+    logging.debug("Creating serial interface on %s:%d" % (uart, baudrate))
+    serial_end = mav.SerialEndpoint("FC", uart, baudrate)
     handlers.append(serial_end)
 
     # Create the connection to the wifibroadcast link
-    wfb_end = mav.UDPEndpoint(router.get_queue(), local_host, local_port, target_host, target_port)
-    router.add_endpoint(wfb_end)
+    logging.debug("Creating UDP interface (%s:%d) to (%s:%d)" % (local_host, local_port, target_host, target_port))
+    wfb_end = mav.UDPEndpoint("WFB", local_host, local_port, target_host, target_port)
     handlers.append(wfb_end)
 
     # Create the connection to a standard GCS link
-    wfb_end = mav.UDPSource(router.get_queue(), 14550)
-    router.add_endpoint(wfb_end)
-    handlers.append(wfb_end)
+    logging.debug("Creating GCS-type UDP interface on port %d" % (int(gcs_port)))
+    gcs_end = mav.UDPSource("GCS", 14550)
+    handlers.append(gcs_end)
 
-    router.join()
+    # Create the routeing links
+    serial_end.add_route(wfb_end)
+    serial_end.add_route(gcs_end)
+    wfb_end.add_route(serial_end)
+    gcs_end.add_route(serial_end)
+
+    # Wait for the endpoints to shutdown then exit
+    for h in handlers:
+        h.join()
     exit(0)

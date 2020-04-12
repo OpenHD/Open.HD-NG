@@ -1,4 +1,5 @@
 
+import time
 import serial
 import socket
 import threading
@@ -197,7 +198,7 @@ cdef class MavlinkMsg:
 
 cdef class RadioStatusMsg(MavlinkMsg):
     def __init__(self, sysid, compid, rssi, remrssi, txbuf, noise, remnoise, rxerrors, fixed):
-        super().__init__(sysid, compid)
+        MavlinkMsg.__init__(self,sysid, compid)
         mavlink_msg_radio_status_pack(sysid, compid, &self.m_msg, rssi, remrssi, txbuf,
                                       noise, remnoise, rxerrors, fixed)
 
@@ -207,6 +208,7 @@ class Mavlink:
         self.m_msg = MavlinkMsg()
         self.sysid = sysid
         self.compid = compid
+        self.peers = []
 
     def get_sysid(self):
         return self.sysid
@@ -229,14 +231,46 @@ class Mavlink:
                 self.m_msg = MavlinkMsg()
         return ret
 
+class Endpoint(object):
 
-class SerialEndpoint:
+    def __init__(self, name, max_queue_size):
+        self.name = name
+        self.send_queue = queue.Queue(maxsize=max_queue_size)
+        self.outputs = []
+        self.peers = {}
+        self.lock = threading.Lock()
+
+    def queue_msg(self, msg):
+        self.send_queue.put(msg)
+
+    def add_route(self, to_endpoint):
+        self.outputs.append(to_endpoint)
+
+    def output_msg(self, msg):
+        for endpoint in self.outputs:
+            endpoint.queue_msg(msg)
+
+    def log_peer(self, sysid):
+        self.lock.acquire()
+        ret = sysid in self.peers
+        self.peers[sysid] = time.time()
+        self.lock.release()
+        return ret
+
+    def timeout_peers(self, timeout):
+        self.lock.acquire()
+        timedout = [sysid for sysid in self.peers if (time.time() - self.peers[sysid]) > timeout]
+        for sysid in timedout:
+            del self.peers[sysid]
+        self.lock.release()
+        return timedout
+
+class SerialEndpoint(Endpoint):
     
-    def __init__(self, out_queue, uart, baudrate, timeout=0.01, blocksize=1024, max_queue_size=100):
+    def __init__(self, name, uart, baudrate, timeout=0.01, blocksize=1024, max_queue_size=100):
+        Endpoint.__init__(self, name, max_queue_size)
         threading.Thread.__init__(self)
         self.mav = Mavlink()
-        self.out_queue = out_queue
-        self.send_queue = queue.Queue(maxsize=max_queue_size)
         self.uart = uart
         self.ser = serial.Serial(uart, baudrate, timeout=timeout)
         self.blocksize = blocksize
@@ -249,11 +283,9 @@ class SerialEndpoint:
         self.writer = threading.Thread(target=self.write_thread)
         self.writer.start()
 
-    def queue_msg(self, msg):
-        self.send_queue.put(msg)
-
     def join(self):
         self.reader.join()
+        self.writer.join()
 
     def terminate(self):
         self.running = False
@@ -266,12 +298,13 @@ class SerialEndpoint:
                 buf = None
             for msg in self.mav.parse_buf(buf):
                 if msg is not None:
-                    logging.debug("Read message from UART: %s of length %d  sysid: %d %d" % (self.uart, msg.len(), msg.sysid(), self.sysid))
-                    if self.sysid != msg.sysid():
-                        self.sysid = msg.sysid()
-                        logging.info("New connection from id: %d on UART: %s",
-                                     msg.sysid(), self.uart)
-                    self.out_queue.put(msg)
+                    logging.debug("(%s) Read message %d from UART: %s of length %d  sysid: %d %d" %
+                                  (self.name, msg.msgid(), self.uart, msg.len(), msg.sysid(), self.sysid))
+                    if not self.log_peer(msg.sysid()):
+                        logging.info("(%s) New connection from id: %d on UART: %s" % (msg.sysid(), self.uart))
+                    self.output_msg(msg)
+            for p in self.timeout_peers(10):
+                logging.info("(%s) Timeout connection from id: %d on " % (p))
 
     def write_thread(self):
         while self.running:
@@ -281,18 +314,20 @@ class SerialEndpoint:
             except:
                 pass # Timeout?
 
-class UDPEndpoint(object):
+class UDPEndpoint(Endpoint):
     
-    def __init__(self, out_queue, local_host, local_port, target_host, target_port,
+    def __init__(self, name, local_host, local_port, target_host, target_port,
                  bufsize=1024, max_queue_size=100):
+        Endpoint.__init__(self, name, max_queue_size)
         threading.Thread.__init__(self)
         self.mav = Mavlink()
-        self.out_queue = out_queue
         self.send_queue = queue.Queue(maxsize=max_queue_size)
         self.local_host = local_host
         self.local_port = int(local_port)
         self.target_host = target_host
         self.target_port = int(target_port)
+        self.orig_target_host = target_host
+        self.orig_target_port = int(target_port)
         self.sysid = 0
 
         # Create and initialize the socket as required
@@ -315,10 +350,10 @@ class UDPEndpoint(object):
             try:
                 self.sock.bind((self.local_host, self.local_port))
             except:
-                logging.fatal("Error binding to local port: (%s:%d)" % \
-                              (self.local_host, self.local_port))
+                logging.fatal("(%s) Error binding to local port: (%s:%d)" % \
+                              (self.name, self.local_host, self.local_port))
             self.sock.setblocking(0)
-        logging.debug("Bound to: %s:%d" % (self.local_host, self.local_port))
+        logging.debug("(%s) Bound to: %s:%d" % (self.name, self.local_host, self.local_port))
 
         # Start the reader and writer threads
         self.running = True
@@ -327,48 +362,58 @@ class UDPEndpoint(object):
         self.writer = threading.Thread(target=self.write_thread)
         self.writer.start()
 
-    def queue_msg(self, msg):
-        self.send_queue.put(msg)
-
     def join(self):
         self.reader.join()
+        self.writer.join()
 
     def terminate(self):
         self.running = False
 
     def read_thread(self):
 
+        # Keep track of when the last message was received so we can switch broadcast back on
+        last_msg_time = 0
         while self.running:
 
+            # Turn broadcast back on if we timeout (10 seconds)
+            if last_msg_time != 0 and (time.time() - last_msg_time) > 10 and \
+               (self.target_host != self.orig_target_host or self.target_port != self.orig_target_port):
+                logging.info("(%s) Turning broadcast back on after timeout" % (self.name))
+                self.target_host = self.orig_target_host
+                self.target_port = self.orig_target_port
+                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                
             # Wait until a message is received so we don't block for too long
             ready = select.select([self.sock], [], [], 1)
             if ready[0]:
 
                 # Receive the message
                 data, addr = self.sock.recvfrom(1024)
-                logging.debug("Received patcket: (length=%d)" % (len(data)))
+                #logging.debug("(%s) Received patcket: (length=%d)" % (self.name, len(data)))
 
                 # Parse the message
                 for msg in self.mav.parse_buf(data):
 
                     # Relay the message
                     if msg is not None:
+                        last_msg_time = time.time()
+                        if not self.log_peer(msg.sysid()):
+                            logging.info("(%s) New connection from id: %d" % (self.name, msg.sysid()))
 
-                        # Is this a new connection?
-                        if self.sysid != msg.sysid():
-                            self.sysid = msg.sysid()
-                            logging.info("New connection from id: %d on UDP (%s:%d) from UDP (%s:%d)",
-                                         msg.sysid(), self.local_host, self.local_port, addr[0], addr[1])
-
-                            # We should ensure that we're sending to that host
+                        # We should ensure that we're sending to that host and not broadcasting
+                        if self.target_host == "" or self.target_host == "<broadcast>":
+                            logging.info("(%s) Turning off broadcast (%s:%d) -> (%s:%d)" %
+                                         (self.name, self.target_host, self.target_port, addr[0], addr[1]))
                             self.target_host = addr[0]
                             self.target_port = addr[1]
-
-                            # Turn off socket
-                            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 0)
+                            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 0)
 
                         # Pass on the message to the router
-                        self.out_queue.put(msg)
+                        self.output_msg(msg)
+                        
+            for p in self.timeout_peers(10):
+                logging.info("(%s) Timeout connection from id: %d" % (self.name,
+                                                                      p))
 
     def write_thread(self):
         while self.running:
@@ -376,8 +421,8 @@ class UDPEndpoint(object):
                 msg = self.send_queue.get(timeout=1)
                 if self.target_host != '' and self.target_port > 0:
                     buf = msg.serialize()
-                    logging.debug("Sending message %d of length %d to (%s:%d)",
-                                  msg.msgid(), len(buf), self.target_host, self.target_port)
+                    logging.debug("(%s) Sending message %d of length %d to (%s:%d)",
+                                  self.name, msg.msgid(), len(buf), self.target_host, self.target_port)
                     self.sock.sendto(buf, (self.target_host, self.target_port))
             except:
                 pass # Timeout?
@@ -390,8 +435,9 @@ class UDPSource(UDPEndpoint):
     of the sender
     '''
 
-    def __init__(self, out_queue, source_port, bufsize=1024, max_queue_size=100):
-        super().__init__(out_queue, '0.0.0.0', 0, '<broadcast>', source_port)
+    def __init__(self, name, source_port, bufsize=1024, max_queue_size=100):
+        UDPEndpoint.__init__(self, name, '0.0.0.0', 0, '<broadcast>', source_port, bufsize=bufsize,
+                             max_queue_size=max_queue_size)
 
 
 class UDPSink(UDPEndpoint):
@@ -400,20 +446,21 @@ class UDPSink(UDPEndpoint):
     uses the address of the received message to communicate back with the sender
     '''
 
-    def __init__(self, out_queue, sink_port, sink_host='0.0.0.0', bufsize=1024, max_queue_size=100):
-        super().__init__(out_queue, sink_host, sink_port, '', 0)
+    def __init__(self, name, sink_port, sink_host='0.0.0.0', bufsize=1024, max_queue_size=100):
+        UDPEndpoint.__init__(self, name, sink_host, sink_port, '', 0,
+                             bufsize=bufsize, max_queue_size=max_queue_size)
 
 
-class WFBStatusEndpoint:
+class WFBStatusEndpoint(Endpoint):
     '''
     Receive and parse wifibroadcast status messages
     and generate mavlink radio status messages from them
     '''
 
-    def __init__(self, out_queue, host='', port=5800, max_queue_size=100):
+    def __init__(self, name, host='', port=5800, max_queue_size=100):
+        Endpoint.__init__(self, name, max_queue_size)
         threading.Thread.__init__(self)
         self.mav = Mavlink()
-        self.out_queue = out_queue
         self.send_queue = queue.Queue(maxsize=max_queue_size)
         self.host = host
         self.port = port
@@ -437,7 +484,7 @@ class WFBStatusEndpoint:
         try:
             self.sock.bind((self.host, self.port))
         except:
-            logging.fatal("Error binding to local port: (%s:%d)" % (self.host, self.port))
+            logging.fatal("(%s) Error binding to local port: (%s:%d)" % (self.name, self.host, self.port))
             self.sock.setblocking(0)
         logging.debug("Bound to: %s:%d" % (self.host, self.port))
 
@@ -445,6 +492,7 @@ class WFBStatusEndpoint:
         self.send_queue.put(msg)
 
     def join(self):
+        self.reader.join()
         self.reader.join()
 
     def terminate(self):
@@ -462,7 +510,8 @@ class WFBStatusEndpoint:
 
                 # Receive the message
                 data, addr = self.sock.recvfrom(1024)
-                logging.debug("Received patcket: (length=%d %d from %s)" % (len(data), sizeof(wifibroadcast_rx_status_forward_t), str(addr)))
+                logging.debug("(%s) Received patcket: (length=%d %d from %s)" %
+                              (self.name, len(data), sizeof(wifibroadcast_rx_status_forward_t), str(addr)))
 
                 # Parse the message
                 if len(data) == sizeof(wifibroadcast_rx_status_forward_t):
@@ -473,11 +522,11 @@ class WFBStatusEndpoint:
                     rssi = min(max(0, 2.5 * (stat.adapter[0].current_signal_dbm + 80), 0), 255)
                     remrssi = min(max(0, 2.5 * (stat.current_signal_telemetry_uplink + 80), 0), 100)
                     remrssi = 100
-                    radio_status = RadioStatusMsg(1, 1, rssi, remrssi, 100, 10, 10, stat.damaged_block_cnt, stat.lost_packet_cnt)
-                    logging.debug("Sending status: %d %d %d %d %d", radio_status.msgid(), rssi, remrssi, stat.adapter[0].received_packet_cnt, stat.received_packet_cnt)
+                    radio_status = RadioStatusMsg(1, 1, rssi, remrssi, 100, 10, 10,
+                                                  stat.damaged_block_cnt, stat.lost_packet_cnt)
 
                     # Pass on the message to the router
-                    self.out_queue.put(radio_status)
+                    self.output_msg(radio_status)
 
     def write_thread(self):
         '''The write thread just empties the queue'''
@@ -486,49 +535,3 @@ class WFBStatusEndpoint:
                 msg = self.send_queue.get(timeout=1)
             except:
                 pass # Timeout?
-
-
-class Router:
-
-    def __init__(self, max_queue_size=500):
-        self.endpoints = []
-        self.queue = queue.Queue(maxsize=500)
-
-        # Start the processing thread
-        self.running = True
-        self.process = threading.Thread(target=self.process_thread)
-        self.process.start()
-
-    def join(self):
-        self.process.join()
-
-    def terminate(self):
-        self.running = False
-
-    def get_queue(self):
-        return self.queue
-
-    def put_queue(self, msg):
-        self.queue.put(msg)
-
-    def add_endpoint(self, endpoint):
-        self.endpoints.append(endpoint)
-
-    def process_thread(self):
-        while self.running:
-            msg = None
-            try:
-                msg = self.queue.get(timeout=1)
-            except:
-                pass # Timeout?
-            if msg is not None:
-                self.route_message(msg)
-
-    def route_message(self, msg):
-        # At this point we will just broadcast all messages to everyone but the sender.
-        for ep in self.endpoints:
-            if ep.sysid != msg.sysid():
-                logging.debug("Routing message %d from sysid %d to %d", msg.msgid(), msg.sysid(), ep.sysid)
-                ep.queue_msg(msg)
-            else:
-                logging.debug("NOT routing message %d from sysid %d to %d", msg.msgid(), msg.sysid(), ep.sysid)
