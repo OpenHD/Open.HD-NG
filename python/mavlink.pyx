@@ -6,6 +6,10 @@ import select
 import queue
 import logging
 
+import numpy as np
+
+from libcpp cimport bool
+from libcpp.string cimport string
 from libc.errno cimport errno, EINTR, EINVAL
 from libc.string cimport memset, memcpy, strerror
 from libc.stdlib cimport malloc, calloc, free
@@ -96,6 +100,64 @@ cdef extern from 'mavlink/common/mavlink_msg_radio_status.h':
     cdef uint16_t mavlink_msg_radio_status_encode(uint8_t system_id, uint8_t component_id,
                                                   mavlink_message_t* msg, const mavlink_radio_status_t* radio_status)
 
+cdef extern from 'wifibroadcast/transfer_stats.hh':
+    ctypedef struct transfer_stats_t:
+        transfer_stats_t(uint32_t _sequences, uint32_t _blocks_in, uint32_t _blocks_out,
+                         uint32_t _bytes_in, uint32_t _bytes_out, uint32_t _block_errors,
+                         uint32_t _sequence_errors, uint32_t _inject_errors,
+                         float _encode_time, float _send_time, float _pkt_time,
+                         float _latency, float _rssi)
+        uint32_t sequences
+        uint32_t blocks_in
+        uint32_t blocks_out
+        uint32_t sequence_errors
+        uint32_t block_errors
+        uint32_t inject_errors
+        uint32_t bytes_in
+        uint32_t bytes_out
+        float encode_time
+        float send_time
+        float pkt_time
+        float latency
+        float rssi
+    cdef cppclass TransferStats:
+        TransferStats(string name)
+        string name()
+        transfer_stats_t get_stats()
+        bool update(string s)
+        void timeout()
+        string serialize()
+    ctypedef struct wifi_adapter_rx_status_forward_t:
+        uint32_t received_packet_cnt
+        int8_t current_signal_dbm
+        int8_t type
+        int8_t signal_good
+    ctypedef struct wifibroadcast_rx_status_forward_t:
+        uint32_t damaged_block_cnt
+        uint32_t lost_packet_cnt
+        uint32_t skipped_packet_cnt
+        uint32_t injection_fail_cnt
+        uint32_t received_packet_cnt
+        uint32_t kbitrate
+        uint32_t kbitrate_measured
+        uint32_t kbitrate_set
+        uint32_t lost_packet_cnt_telemetry_up
+        uint32_t lost_packet_cnt_telemetry_down
+        uint32_t lost_packet_cnt_msp_up
+        uint32_t lost_packet_cnt_msp_down
+        uint32_t lost_packet_cnt_rc
+        int8_t current_signal_joystick_uplink
+        int8_t current_signal_telemetry_uplink
+        int8_t joystick_connected
+        float HomeLat
+        float HomeLon
+        uint8_t cpuload_gnd
+        uint8_t temp_gnd
+        uint8_t cpuload_air
+        uint8_t temp_air
+        uint32_t wifi_adapter_cnt
+        wifi_adapter_rx_status_forward_t *adapter
+
 cdef class MavlinkMsg:
     cdef mavlink_message_t m_msg
     cdef mavlink_status_t m_status
@@ -134,7 +196,6 @@ cdef class MavlinkMsg:
         return arr
 
 cdef class RadioStatusMsg(MavlinkMsg):
-
     def __init__(self, sysid, compid, rssi, remrssi, txbuf, noise, remnoise, rxerrors, fixed):
         super().__init__(sysid, compid)
         mavlink_msg_radio_status_pack(sysid, compid, &self.m_msg, rssi, remrssi, txbuf,
@@ -205,7 +266,7 @@ class SerialEndpoint:
                 buf = None
             for msg in self.mav.parse_buf(buf):
                 if msg is not None:
-                    logging.debug("Read message from UART: %s of length %d" % (self.uart, msg.len()))
+                    logging.debug("Read message from UART: %s of length %d  sysid: %d %d" % (self.uart, msg.len(), msg.sysid(), self.sysid))
                     if self.sysid != msg.sysid():
                         self.sysid = msg.sysid()
                         logging.info("New connection from id: %d on UART: %s",
@@ -315,8 +376,8 @@ class UDPEndpoint(object):
                 msg = self.send_queue.get(timeout=1)
                 if self.target_host != '' and self.target_port > 0:
                     buf = msg.serialize()
-                    logging.debug("Sending message of length %d to (%s:%d)",
-                                  len(buf), self.target_host, self.target_port)
+                    logging.debug("Sending message %d of length %d to (%s:%d)",
+                                  msg.msgid(), len(buf), self.target_host, self.target_port)
                     self.sock.sendto(buf, (self.target_host, self.target_port))
             except:
                 pass # Timeout?
@@ -341,6 +402,90 @@ class UDPSink(UDPEndpoint):
 
     def __init__(self, out_queue, sink_port, sink_host='0.0.0.0', bufsize=1024, max_queue_size=100):
         super().__init__(out_queue, sink_host, sink_port, '', 0)
+
+
+class WFBStatusEndpoint:
+    '''
+    Receive and parse wifibroadcast status messages
+    and generate mavlink radio status messages from them
+    '''
+
+    def __init__(self, out_queue, host='', port=5800, max_queue_size=100):
+        threading.Thread.__init__(self)
+        self.mav = Mavlink()
+        self.out_queue = out_queue
+        self.send_queue = queue.Queue(maxsize=max_queue_size)
+        self.host = host
+        self.port = port
+        self.sysid = 1 # We're pretending to be a flight controller
+
+        # Create and initialize the socket as required
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+
+        # Default the socket to broadcast
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+        # Start the reader thread
+        self.running = True
+        self.reader = threading.Thread(target=self.read_thread)
+        self.reader.start()
+        self.writer = threading.Thread(target=self.write_thread)
+        self.writer.start()
+
+        # Bind to the status receive port
+        try:
+            self.sock.bind((self.host, self.port))
+        except:
+            logging.fatal("Error binding to local port: (%s:%d)" % (self.host, self.port))
+            self.sock.setblocking(0)
+        logging.debug("Bound to: %s:%d" % (self.host, self.port))
+
+    def queue_msg(self, msg):
+        self.send_queue.put(msg)
+
+    def join(self):
+        self.reader.join()
+
+    def terminate(self):
+        self.running = False
+
+    def read_thread(self):
+        cdef wifibroadcast_rx_status_forward_t stat;
+        cdef char *statp = <char*>&stat;
+
+        while self.running:
+
+            # Wait until a message is received so we don't block for too long
+            ready = select.select([self.sock], [], [], 1)
+            if ready[0]:
+
+                # Receive the message
+                data, addr = self.sock.recvfrom(1024)
+                logging.debug("Received patcket: (length=%d %d from %s)" % (len(data), sizeof(wifibroadcast_rx_status_forward_t), str(addr)))
+
+                # Parse the message
+                if len(data) == sizeof(wifibroadcast_rx_status_forward_t):
+
+                    # Create the mavlink radio status message
+                    for i in range(len(data)):
+                        statp[i] = data[i]
+                    rssi = min(max(0, 2.5 * (stat.adapter[0].current_signal_dbm + 80), 0), 255)
+                    remrssi = min(max(0, 2.5 * (stat.current_signal_telemetry_uplink + 80), 0), 100)
+                    remrssi = 100
+                    radio_status = RadioStatusMsg(1, 1, rssi, remrssi, 100, 10, 10, stat.damaged_block_cnt, stat.lost_packet_cnt)
+                    logging.debug("Sending status: %d %d %d %d %d", radio_status.msgid(), rssi, remrssi, stat.adapter[0].received_packet_cnt, stat.received_packet_cnt)
+
+                    # Pass on the message to the router
+                    self.out_queue.put(radio_status)
+
+    def write_thread(self):
+        '''The write thread just empties the queue'''
+        while self.running:
+            try:
+                msg = self.send_queue.get(timeout=1)
+            except:
+                pass # Timeout?
 
 
 class Router:
@@ -382,5 +527,8 @@ class Router:
     def route_message(self, msg):
         # At this point we will just broadcast all messages to everyone but the sender.
         for ep in self.endpoints:
-            if ep.sysid != msg.sysid:
+            if ep.sysid != msg.sysid():
+                logging.debug("Routing message %d from sysid %d to %d", msg.msgid(), msg.sysid(), ep.sysid)
                 ep.queue_msg(msg)
+            else:
+                logging.debug("NOT routing message %d from sysid %d to %d", msg.msgid(), msg.sysid(), ep.sysid)

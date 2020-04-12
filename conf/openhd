@@ -1,5 +1,5 @@
 [global]
-log_level = critical
+log_level = info
 sydlog_level = info
 primary_camera = True
 video_port = 5600
@@ -35,6 +35,7 @@ port = 14650
 rc_host = 127.0.0.1
 rc_port = 14651
 gcs_port = 14550
+status_port = 5800
 
 [air_telemetry]
 uart = /dev/ttyS1

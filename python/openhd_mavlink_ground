@@ -46,11 +46,12 @@ logging.basicConfig(level=min(log_level, syslog_level), format="%(asctime)s %(le
 
 handlers = []
 
-# Configure a signal handler to exit cleanly
 def handler(signal_received, frame):
+    '''A signal handler to that will initiate a clean shutdown of the script'''
     for h in handlers:
         h.terminate()
     router.terminate()
+
 
 if __name__ == '__main__':
 
@@ -62,6 +63,7 @@ if __name__ == '__main__':
     target_host = config['ground_telemetry'].get('rc_host')
     target_port = int(config['ground_telemetry'].get('rc_port'))
     gcs_port = int(config['ground_telemetry'].get('gcs_port'))
+    status_port = int(config['ground_telemetry'].get('status_port'))
 
     # Setup the exit signal handler
     signal.signal(signal.SIGINT, handler)
@@ -74,6 +76,12 @@ if __name__ == '__main__':
     wfb_end = mav.UDPEndpoint(router.get_queue(), local_host, local_port, target_host, target_port)
     router.add_endpoint(wfb_end)
     handlers.append(wfb_end)
+
+    # Create the connection to receive wifibroadcast status on
+    logging.debug("Receiving wifibroadcast status on %d" % (status_port))
+    status_end = mav.WFBStatusEndpoint(router.get_queue(), port=status_port)
+    router.add_endpoint(status_end)
+    handlers.append(status_end)
     
     # Create the connection that can be used to connect to a standard GCS
     logging.debug("Creating GCS-type UDP interface on port %d" % (int(gcs_port)))
