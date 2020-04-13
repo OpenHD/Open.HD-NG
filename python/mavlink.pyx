@@ -301,7 +301,7 @@ class SerialEndpoint(Endpoint):
                     logging.debug("(%s) Read message %d from UART: %s of length %d  sysid: %d %d" %
                                   (self.name, msg.msgid(), self.uart, msg.len(), msg.sysid(), self.sysid))
                     if not self.log_peer(msg.sysid()):
-                        logging.info("(%s) New connection from id: %d on UART: %s" % (msg.sysid(), self.uart))
+                        logging.info("(%s) New connection from id: %d on UART: %s" % (self.name, msg.sysid(), self.uart))
                     self.output_msg(msg)
             for p in self.timeout_peers(10):
                 logging.info("(%s) Timeout connection from id: %d on " % (p))
@@ -389,7 +389,6 @@ class UDPEndpoint(Endpoint):
 
                 # Receive the message
                 data, addr = self.sock.recvfrom(1024)
-                #logging.debug("(%s) Received patcket: (length=%d)" % (self.name, len(data)))
 
                 # Parse the message
                 for msg in self.mav.parse_buf(data):
@@ -397,6 +396,8 @@ class UDPEndpoint(Endpoint):
                     # Relay the message
                     if msg is not None:
                         last_msg_time = time.time()
+                        logging.debug("(%s) Received msg %d of length %d from (%s:%d)" %
+                                      (self.name, msg.msgid(), len(data), addr[0], addr[1]))
                         if not self.log_peer(msg.sysid()):
                             logging.info("(%s) New connection from id: %d" % (self.name, msg.sysid()))
 
@@ -510,8 +511,6 @@ class WFBStatusEndpoint(Endpoint):
 
                 # Receive the message
                 data, addr = self.sock.recvfrom(1024)
-                logging.debug("(%s) Received patcket: (length=%d %d from %s)" %
-                              (self.name, len(data), sizeof(wifibroadcast_rx_status_forward_t), str(addr)))
 
                 # Parse the message
                 if len(data) == sizeof(wifibroadcast_rx_status_forward_t):
@@ -526,6 +525,7 @@ class WFBStatusEndpoint(Endpoint):
                                                   stat.damaged_block_cnt, stat.lost_packet_cnt)
 
                     # Pass on the message to the router
+                    logging.debug("(%s) Sending status message %d", self.name, radio_status.msgid())
                     self.output_msg(radio_status)
 
     def write_thread(self):

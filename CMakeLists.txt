@@ -87,7 +87,7 @@ include_directories(${PROJECT_SOURCE_DIR}/modules)
 include_directories(${PROJECT_SOURCE_DIR}/modules/mavlink/common)
 
 # Build the MSP to Mavlink converter
-add_executable(msp_to_mavlink src/msp_to_mavlink.cc src/MSPTelemetry.cc src/logging.cc)
+add_executable(msp_to_mavlink src/msp_to_mavlink.cc src/MSPTelemetry.cc  src/MSPMavlinkMsgs.cc src/logging.cc)
 install(TARGETS msp_to_mavlink DESTINATION ${BinDir} COMPONENT applications)
 target_link_libraries(msp_to_mavlink ${Boost_LIBRARIES} msp_fcu pthread)
 

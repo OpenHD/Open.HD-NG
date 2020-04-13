@@ -14,8 +14,8 @@ class MSPTelemetry {
 public:
 
   MSPTelemetry(const std::string &device, uint32_t baudrate,
-	       const std::string &recv_host, uint16_t recv_port,
-	       const std::string &send_host, uint16_t send_port);
+	       const std::string &send_host, uint16_t send_port,
+	       uint16_t recv_port, uint8_t sysid = 1, uint8_t compid = 1);
 
   void start();
   void stop();
@@ -32,7 +32,7 @@ private:
   void udp_receive_loop();
 
   fcu::FlightController m_fcu;
-  boost::asio::io_service m_recv_service;
+  boost::asio::io_service m_io_service;
   boost::asio::ip::udp::endpoint m_recv_endpoint;
   boost::asio::ip::udp::socket m_recv_sock;
   SharedQueue<std::shared_ptr<std::vector<uint8_t> > > m_send_queue;
@@ -41,6 +41,8 @@ private:
 
   bool m_stop;
 
+  uint8_t m_sysid;
+  uint8_t m_compid;
   mavlink_heartbeat_t m_heartbeat;
 };
 

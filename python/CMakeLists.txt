@@ -27,6 +27,10 @@ target_link_libraries(py_v4l2 ${PYTHON_LIBRARY} ${Extra_Libraries} v4l2)
 cython_add_module(mavlink)
 target_link_libraries(mavlink ${PYTHON_LIBRARY} ${Extra_Libraries})
 
+# Build the mavlink cython interface
+#cython_add_module(msp)
+#target_link_libraries(msp ${PYTHON_LIBRARY} ${Extra_Libraries})
+
 # Install the cython targets.
 install(TARGETS fec py_v4l2 mavlink DESTINATION ${RELATIVE_PYTHON_DIR})
 
