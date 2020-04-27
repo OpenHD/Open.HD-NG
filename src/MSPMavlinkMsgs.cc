@@ -6,6 +6,9 @@
 
 void MSPTelemetry::onStatus(const msp::msg::Status& status) {
 
+  // Convert the MSP fleight mode to an appropriate mavlink flight mode
+  fcu::FlightMode flight_mode = m_fcu.getFlightMode();
+  
   // Send the heartbeat message.
   mavlink_message_t msg_hb;
   mavlink_msg_heartbeat_encode(m_sysid, m_compid, &msg_hb, &m_heartbeat);
@@ -27,9 +30,9 @@ void MSPTelemetry::onAttitude(const msp::msg::Attitude& attitude) {
 
   // Send the attitude message.
   mavlink_attitude_t mav_attitude;
-  mav_attitude.roll = attitude.roll;
-  mav_attitude.pitch = attitude.pitch;
-  mav_attitude.yaw = attitude.yaw;
+  mav_attitude.roll = static_cast<float>(attitude.roll) * M_PI / 1800.0;
+  mav_attitude.pitch = static_cast<float>(attitude.pitch) * M_PI / 1800.0;
+  mav_attitude.yaw = static_cast<float>(attitude.yaw) * M_PI / 1800.0;
   mav_attitude.rollspeed = 0;
   mav_attitude.pitchspeed = 0;
   mav_attitude.yawspeed = 0;
@@ -55,7 +58,7 @@ void MSPTelemetry::onAnalog(const msp::msg::Analog& analog) {
   mav_sys_stat.onboard_control_sensors_health = sensors;
   mav_sys_stat.load = 500;
   mav_sys_stat.voltage_battery = analog.vbat * 100;
-  mav_sys_stat.current_battery = analog.amperage;
+  mav_sys_stat.current_battery = analog.amperage / 10.0;
   mav_sys_stat.battery_remaining = -1;
   mav_sys_stat.drop_rate_comm = 0;
   mav_sys_stat.errors_comm = 0;
@@ -72,10 +75,13 @@ void MSPTelemetry::onAnalog(const msp::msg::Analog& analog) {
   mav_bat_stat.current_consumed = -1;
   mav_bat_stat.energy_consumed = -1;
   mav_bat_stat.temperature = INT16_MAX;
-  for (uint8_t i = 0; i < MAVLINK_MSG_BATTERY_STATUS_FIELD_VOLTAGES_LEN; ++i) {
+  mav_bat_stat.voltages[0] = analog.vbat * 10 / 3;
+  mav_bat_stat.voltages[1] = analog.vbat * 10 / 3;
+  mav_bat_stat.voltages[2] = analog.vbat * 10 / 3;
+  for (uint8_t i = 3; i < MAVLINK_MSG_BATTERY_STATUS_FIELD_VOLTAGES_LEN; ++i) {
     mav_bat_stat.voltages[i] = UINT16_MAX;
   }
-  mav_bat_stat.current_battery = analog.amperage;
+  mav_bat_stat.current_battery = analog.amperage / 10.0;
   mav_bat_stat.id = 0;
   mav_bat_stat.battery_function = 0;
   mav_bat_stat.type = 0;

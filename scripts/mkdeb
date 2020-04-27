@@ -1,8 +1,12 @@
 #!/bin/sh
 
+# Install the OpenHD debian repository
+echo "deb https://dl.bintray.com/webbbn/openhd_test buster testing" >> /etc/apt/sources.list
+wget -qO - https://bintray.com/user/downloadSubjectPublicKey?username=bintray | apt-key add -
+
 # Install the build dependencies
 apt-get update
-apt-get install -y git libboost-all-dev cmake build-essential cython3 libv4l-dev libasio-dev
+apt-get install -y git libboost-all-dev cmake build-essential cython3 libv4l-dev libasio-dev wifibroadcast_bridge
 
 # Make sure the submodules are updated
 git submodule update --init
@@ -11,14 +15,6 @@ git submodule update --init
 rm -rf build
 mkdir build
 cd build
-
-# Build a local copy of wifibroadcast_bridge to get the fec library.
-git clone https://github.com/webbbn/wifibroadcast_bridge.git
-(
-    cd wifibroadcast_bridge
-    ./scripts/mkdeb
-    dpkg -i build/*.deb
-)
 
 # Build this deb package
 cmake ..

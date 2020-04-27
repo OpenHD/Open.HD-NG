@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(Open.HD-NG)
 
-set(VERSION "0.9.19")
+set(VERSION "0.9.20")
 
 # Point to our local cmake files
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
@@ -52,6 +52,9 @@ endif()
 if(NOT EXISTS "${PROJECT_SOURCE_DIR}/modules/msp/inc/msp/msp_msg.hpp")
   message(FATAL_ERROR "The msp submodule was not downloaded! Please update submodules and try again.")
 endif()
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/modules/inav/src/main/telemetry/mavlink.h")
+  message(FATAL_ERROR "The inav submodule was not downloaded! Please update submodules and try again.")
+endif()
 
 # Add the local include directory to the include path
 include_directories(${PROJECT_SOURCE_DIR}/include)
@@ -70,6 +73,9 @@ endif ()
 # Add the msp sudmodule to the list of directories to build
 add_subdirectory(modules/msp)
 include_directories(modules/msp/inc)
+
+# Add the inav directory to the include path
+include_directories(/modules/modules/inav/src/main)
 
 # Add the python directory to the list of directories to build
 add_subdirectory(python)

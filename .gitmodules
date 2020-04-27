@@ -4,3 +4,6 @@
 [submodule "modules/msp"]
 	path = modules/msp
 	url = https://github.com/webbbn/msp.git
+[submodule "modules/inav"]
+	path = modules/inav
+	url = https://github.com/iNavFlight/inav.git
