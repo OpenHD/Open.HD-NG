@@ -299,18 +299,21 @@ class SerialEndpoint(Endpoint):
             for msg in self.mav.parse_buf(buf):
                 if msg is not None:
                     logging.debug("(%s) Read message %d from UART: %s of length %d  sysid: %d %d" %
-                                  (self.name, msg.msgid(), self.uart, msg.len(), msg.sysid(), self.sysid))
+                                  (self.name, msg.msgid(), self.uart, len(buf), msg.sysid(), self.sysid))
                     if not self.log_peer(msg.sysid()):
                         logging.info("(%s) New connection from id: %d on UART: %s" % (self.name, msg.sysid(), self.uart))
                     self.output_msg(msg)
             for p in self.timeout_peers(10):
-                logging.info("(%s) Timeout connection from id: %d on " % (p))
+                logging.info("(%s) Timeout connection from id: %d on " % (self.name, p))
 
     def write_thread(self):
         while self.running:
             try:
                 msg = self.send_queue.get(timeout=1)
-                self.ser.write(msg.serialize())
+                buf = msg.serialize()
+                logging.debug("(%s) Write message %d to UART: %s of length %d  sysid: %d %d" %
+                              (self.name, msg.msgid(), self.uart, len(buf), msg.sysid(), self.sysid))
+                self.ser.write(buf)
             except:
                 pass # Timeout?
 
@@ -516,6 +519,7 @@ class WFBStatusEndpoint(Endpoint):
                 if len(data) == sizeof(wifibroadcast_rx_status_forward_t):
 
                     # Create the mavlink radio status message
+                    # Note: damaged packet counts can overflow!
                     for i in range(len(data)):
                         statp[i] = data[i]
                     rssi = min(max(0, 2.5 * (stat.adapter[0].current_signal_dbm + 80), 0), 255)

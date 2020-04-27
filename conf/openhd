@@ -27,6 +27,8 @@ video_blocksize_secondary = 1400
 fec_ratio_secondary = 0.0
 
 [ground_telemetry]
+uart = /dev/ttyUSB0
+baudrate = 115200
 protocol = mavlink
 host = 127.0.0.1
 port = 14650
