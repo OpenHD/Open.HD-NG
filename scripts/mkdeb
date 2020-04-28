@@ -1,12 +1,34 @@
 #!/bin/sh
 
-# Install the OpenHD debian repository
-echo "deb https://dl.bintray.com/webbbn/openhd_test buster testing" >> /etc/apt/sources.list
-wget -qO - https://bintray.com/user/downloadSubjectPublicKey?username=bintray | apt-key add -
+# Ensure that dpkg doesn't prompt for input
+export DEBIAN_FRONTEND=noninteractive
 
 # Install the build dependencies
 apt-get update
-apt-get install -y git libboost-all-dev cmake build-essential cython3 libv4l-dev libasio-dev wifibroadcast_bridge
+apt-get install -y git libboost-all-dev cmake build-essential cython3 libv4l-dev libasio-dev wget lsb-release systemd
+
+# Install the OpenHD debian repository and the wifibroadcast_bridge package
+DISTRO=`lsb_release -c -s`
+case $DISTRO in
+    "bionic")
+        apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61
+        echo "deb https://dl.bintray.com/webbbn/openhd_test $DISTRO testing" >> /etc/apt/sources.list
+        ;;
+    "focal")
+        apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61
+        echo "deb https://dl.bintray.com/webbbn/openhd_test $DISTRO testing" >> /etc/apt/sources.list
+        ;;
+    "stretch")
+        echo "deb https://dl.bintray.com/webbbn/openhd_test $DISTRO testing" >> /etc/apt/sources.list
+        wget -qO - https://bintray.com/user/downloadSubjectPublicKey?username=bintray | apt-key add -
+        ;;
+    "buster")
+        echo "deb https://dl.bintray.com/webbbn/openhd_test $DISTRO testing" >> /etc/apt/sources.list
+        wget -qO - https://bintray.com/user/downloadSubjectPublicKey?username=bintray | apt-key add -
+        ;;
+esac
+apt-get update
+apt-get install -y wifibroadcast_bridge
 
 # Make sure the submodules are updated
 git submodule update --init

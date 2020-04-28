@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(Open.HD-NG)
 
-set(VERSION "0.9.21")
+set(VERSION "0.9.22")
 
 # Point to our local cmake files
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
@@ -85,6 +85,7 @@ find_package(Boost REQUIRED COMPONENTS
   program_options
   system
   filesystem
+  log_setup
   log)
 include_directories(${Boost_INCLUDE_DIR})
 
