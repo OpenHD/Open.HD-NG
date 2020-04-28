@@ -9,7 +9,8 @@
 #include <CRSFTelemetry.hh>
 #include <logging.hh>
 
-#define CRSF_RADIO_ADDRESS 0xEA
+//#define CRSF_RADIO_ADDRESS 0xEA
+#define CRSF_RADIO_ADDRESS 0xC8
 
 typedef enum {
 	      CRSF_ATTITUDE = 0x1E,
@@ -104,11 +105,16 @@ void big_endian_deg_to_radians_10000(std::vector<uint8_t> &buf, float v) {
 }
 
 
-CRSFTelemetry::CRSFTelemetry(uint16_t recv_port, uint16_t send_port, uint16_t status_port)
-  : m_rec_bat_status(false), m_connected(false), m_rc_fresh(false) {
+CRSFTelemetry::CRSFTelemetry(bool mavlink,
+                             uint16_t recv_port, uint16_t send_port, uint16_t status_port)
+  : m_mavlink(mavlink), m_rec_bat_status(false), m_connected(false), m_rc_fresh(false),
+    m_send_sock(m_send_service), m_sender_endpoint(boost::asio::ip::address_v4::any(), send_port) {
   std::thread([this, recv_port]() { this->reader_thread(recv_port); }).detach();
   std::thread([this, status_port]() { this->status_thread(status_port); }).detach();
-  std::thread([this, send_port]() { this->control_thread(send_port); }).detach();
+  std::thread([this, send_port]() { this->control_thread(); }).detach();
+  m_send_sock.open(boost::asio::ip::udp::v4());
+  m_send_sock.set_option(boost::asio::socket_base::broadcast(true));
+  boost::asio::ip::udp::endpoint sender_endpoint(boost::asio::ip::address_v4::any(), send_port);
 }
 
 bool CRSFTelemetry::get_value(const std::string &name, float &value) const {
@@ -428,8 +434,10 @@ void CRSFTelemetry::status_thread(uint16_t port) {
   status_sock.set_option(boost::asio::socket_base::broadcast(true));
 
   double last_recv = 0;
+  double last_send = 0;
   wifibroadcast_rx_status_forward_t prev_link_stats;
   double rx_quality = 0;
+  float link_timeout = 5.0;
   while(1) {
 
     // Receive the next link status message
@@ -445,7 +453,7 @@ void CRSFTelemetry::status_thread(uint16_t port) {
     // or the previous one is too old
     double time = cur_time();
     double tdiff = time - last_recv;
-    if ((tdiff < 0) || (tdiff > 5)) {
+    if ((tdiff < 0) || (tdiff > link_timeout)) {
       prev_link_stats = m_link_stats;
       rx_quality = 0;
     }
@@ -468,31 +476,31 @@ void CRSFTelemetry::status_thread(uint16_t port) {
     uint8_t tx_signal_quality = 100;
     uint8_t tx_snr = 8;
     send_link_packet(m_link_stats.adapter[0].current_signal_dbm,
-		     m_link_stats.adapter[1].current_signal_dbm,
-		     rx_signal_quality,
-		     rx_snr,
-		     rx_antenna,
-		     rf_mode,
-		     tx_power,
-		     m_link_stats.current_signal_joystick_uplink,
-		     tx_signal_quality,
-		     tx_snr);
+                     m_link_stats.adapter[1].current_signal_dbm,
+                     rx_signal_quality,
+                     rx_snr,
+                     rx_antenna,
+                     rf_mode,
+                     tx_power,
+                     m_link_stats.current_signal_joystick_uplink,
+                     tx_signal_quality,
+                     tx_snr);
     prev_link_stats = m_link_stats;
   }
 }
 
-void CRSFTelemetry::control_thread(uint16_t port) {
+
+void CRSFTelemetry::send_rc(const std::vector<uint8_t> &msg) {
+  m_send_sock.send_to(boost::asio::buffer(msg.data(), msg.size()), m_sender_endpoint);
+}
+
+void CRSFTelemetry::control_thread() {
   int max_length = 1024;
   uint8_t data[max_length];
   bool done = false;
-  boost::asio::io_service send_service;
-  boost::asio::ip::udp::socket send_sock(send_service);
-  send_sock.open(boost::asio::ip::udp::v4());
-  send_sock.set_option(boost::asio::socket_base::broadcast(true));
-  boost::asio::ip::udp::endpoint sender_endpoint(boost::asio::ip::address_v4::any(), port);
 
   // Don't send anything until we've recieved a packet.
-  while (!m_connected) {
+  while (!m_connected || !m_mavlink) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
     
@@ -503,7 +511,7 @@ void CRSFTelemetry::control_thread(uint16_t port) {
       mavlink_message_t msg_rc;
       mavlink_msg_rc_channels_override_encode(1, 1, &msg_rc, &m_mavlink_rc_override);
       int len = mavlink_msg_to_send_buffer(data, &msg_rc);
-      send_sock.send_to(boost::asio::buffer(data, len), sender_endpoint);
+      m_send_sock.send_to(boost::asio::buffer(data, len), m_sender_endpoint);
       LOG_DEBUG << "Sending RC Override: " << len;
       m_rc_fresh = false;
     }

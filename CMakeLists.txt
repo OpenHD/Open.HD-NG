@@ -52,9 +52,6 @@ endif()
 if(NOT EXISTS "${PROJECT_SOURCE_DIR}/modules/msp/inc/msp/msp_msg.hpp")
   message(FATAL_ERROR "The msp submodule was not downloaded! Please update submodules and try again.")
 endif()
-if(NOT EXISTS "${PROJECT_SOURCE_DIR}/modules/inav/src/main/telemetry/mavlink.h")
-  message(FATAL_ERROR "The inav submodule was not downloaded! Please update submodules and try again.")
-endif()
 
 # Add the local include directory to the include path
 include_directories(${PROJECT_SOURCE_DIR}/include)

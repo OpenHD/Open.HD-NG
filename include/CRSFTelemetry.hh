@@ -51,7 +51,8 @@ class CRSFTelemetry {
 public:
   typedef SharedQueue<std::vector<uint8_t> > BufferQueue;
 
-  CRSFTelemetry(uint16_t recv_port = 14551, uint16_t send_port = 14550, uint16_t status_port = 5800);
+  CRSFTelemetry(bool mavlink, uint16_t recv_port = 14551, uint16_t send_port = 14550,
+                uint16_t status_port = 5800);
 
   bool get_value(const std::string &name, float &value) const;
 
@@ -68,6 +69,8 @@ public:
   const boost::asio::ip::udp::endpoint &sender_endpoint();
 
   BufferQueue &send_queue() { return m_send_queue; }
+
+  void send_rc(const std::vector<uint8_t> &msg);
 
 private:
   typedef std::map<std::string, float> NVMap;
@@ -86,10 +89,11 @@ private:
 
   void reader_thread(uint16_t port = 14551);
   void status_thread(uint16_t port = 5800);
-  void control_thread(uint16_t port = 14550);
+  void control_thread();
 
   //boost::asio::io_service m_send_service;
   //boost::asio::ip::udp::socket m_send_sock;
+  bool m_mavlink;
   NVMap m_values;
   uint8_t m_sysid;
   uint8_t m_compid;
@@ -99,6 +103,9 @@ private:
   wifibroadcast_rx_status_forward_t m_link_stats;
   mavlink_rc_channels_override_t m_mavlink_rc_override;
   BufferQueue m_send_queue;
+  boost::asio::io_service m_send_service;
+  boost::asio::ip::udp::socket m_send_sock;
+  boost::asio::ip::udp::endpoint m_sender_endpoint;
 };
 
 #endif /* OPENHDNG_CRSFTELEMETRY_HH */
