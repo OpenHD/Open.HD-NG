@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import signal
+import serial
+import socket
+import logging
+import logging.handlers
+import configparser
+import threading
+
+from openhd import crsf
+
+# The first and only argument should be the component config file.
+if len(sys.argv) != 2 or not os.path.isfile(sys.argv[1]):
+    sys.stderr.write("Usage: " + sys.argv[0] + " <config file>\n")
+    exit(1)
+config_filename = sys.argv[1]
+
+# Read the config file
+config = configparser.ConfigParser()
+config['global'] = {
+    'log_level': 'critical',
+    'syslog_level': 'info',
+}
+try:
+    config.read(config_filename)
+except:
+    print("Error reading the configuration file: " + config_filename)
+    exit
+
+# Configure the logger
+log_level = getattr(logging, config['global'].get('log_level').upper())
+syslog_level = getattr(logging, config['global'].get('syslog_level').upper())
+if not isinstance(log_level, int):
+    print("Invalid log level: %s - setting to info" % (args.log_level))
+    log_level = logging.INFO
+if not isinstance(syslog_level, int):
+    print("Invalid syslog level: %s - setting to info" % (args.syslog_level))
+    syslog_level = logging.INFO
+logger = logging.getLogger('wifi_config')
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(log_level)
+syslog_handler = logging.handlers.SysLogHandler(address = "/dev/log")
+syslog_handler.setLevel(syslog_level)
+logging.basicConfig(level=min(log_level, syslog_level), format="%(asctime)s %(levelname)s: %(message)s",
+                    datefmt="%H:%M:%S", handlers = [stream_handler, syslog_handler])
+
+def handler(signal_received, frame):
+    '''A signal handler to that will initiate a clean shutdown of the script'''
+    global run
+    run = False
+
+
+def downstream_thread(ser, sock, host, port):
+    parser = crsf.TelemetryParser()
+    global run
+    run = True
+    while(run):
+        # Read the next byte
+        b = ser.read(1)[0]
+        ret = parser.parse(b)
+        if ret[0] == crsf.TelemetryState.COMPLETE:
+            # Send the telemetry packet
+            sock.sendto(ret[1], (host, port))
+        elif ret[0] == crsf.TelemetryState.PARSE_ERROR:
+            print("Error")
+
+def upstream_thread(ser, sock):
+    global run
+    run = True
+    while(run):
+        # Read the next packet
+        data, addr = sock.recvfrom(128)
+        ser.write(data)
+
+if __name__ == '__main__':
+
+    # Retrieve the configuration parameters
+    uart = config['crsf_air'].get('uart')
+    baudrate = config['crsf_air'].get('baudrate')
+    source_host = config['crsf_air'].get('source_host')
+    source_port = int(config['crsf_air'].get('source_port'))
+    target_host = config['crsf_air'].get('target_host')
+    target_port = int(config['crsf_air'].get('target_port'))
+
+    # Create the UDP interfaces
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((source_host, source_port))
+
+    # Connect to the UART
+    ser = serial.Serial(uart, baudrate=baudrate)
+
+    # Setup the exit signal handler
+    signal.signal(signal.SIGINT, handler)
+
+    dsthr = threading.Thread(target=downstream_thread, args=(ser, sock, target_host, target_port))
+    dsthr.start()
+    usthr = threading.Thread(target=upstream_thread, args=(ser, sock))
+    usthr.start()
+    dsthr.join()
+    usthr.join()

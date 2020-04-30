@@ -1,0 +1,13 @@
+[Unit]
+Description=TBS Crossfire Transmitter air-side interface for OpenHD
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/crsf
+ExecStart=/usr/bin/openhd_crsf_air /etc/default/openhd
+TimeoutStopSec=5s
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=air.target

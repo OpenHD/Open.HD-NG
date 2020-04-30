@@ -41,6 +41,7 @@ install(PROGRAMS openhd_controller DESTINATION ${BinDir})
 install(PROGRAMS openhd_mavlink_air DESTINATION ${BinDir})
 install(PROGRAMS openhd_mavlink_ground DESTINATION ${BinDir})
 install(PROGRAMS openhd_mavlink_transmitter DESTINATION ${BinDir})
+install(PROGRAMS openhd_crsf_air DESTINATION ${BinDir})
 
 # Install the python libraries
 install(FILES
@@ -51,4 +52,5 @@ install(FILES
   MavlinkTelemetry.py
   transmitter.py
   video_player.py
+  crsf.py
   DESTINATION ${RELATIVE_PYTHON_DIR})

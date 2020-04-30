@@ -52,3 +52,11 @@ protocol = mavlink
 uart = /dev/ttyS1
 baudrate = 115200
 port = 14550
+
+[crsf_air]
+uart = /dev/ttyAMA0
+baudrate = 500000
+source_host = 127.0.0.1
+source_port = 14651
+target_host = 127.0.0.1
+target_port = 14650
