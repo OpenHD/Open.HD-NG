@@ -41,22 +41,22 @@ typedef enum {
 } CRSFStates;
 
 struct CRSFChannels {
-    uint16_t ch0 : 11;
-    uint16_t ch1 : 11;
-    uint16_t ch2 : 11;
-    uint16_t ch3 : 11;
-    uint16_t ch4 : 11;
-    uint16_t ch5 : 11;
-    uint16_t ch6 : 11;
-    uint16_t ch7 : 11;
-    uint16_t ch8 : 11;
-    uint16_t ch9 : 11;
-    uint16_t ch10 : 11;
-    uint16_t ch11 : 11;
-    uint16_t ch12 : 11;
-    uint16_t ch13 : 11;
-    uint16_t ch14 : 11;
-    uint16_t ch15 : 11;
+  uint16_t ch0 : 11;
+  uint16_t ch1 : 11;
+  uint16_t ch2 : 11;
+  uint16_t ch3 : 11;
+  uint16_t ch4 : 11;
+  uint16_t ch5 : 11;
+  uint16_t ch6 : 11;
+  uint16_t ch7 : 11;
+  uint16_t ch8 : 11;
+  uint16_t ch9 : 11;
+  uint16_t ch10 : 11;
+  uint16_t ch11 : 11;
+  uint16_t ch12 : 11;
+  uint16_t ch13 : 11;
+  uint16_t ch14 : 11;
+  uint16_t ch15 : 11;
 } __attribute__ ((__packed__));
 
 double cur_time() {
@@ -124,10 +124,10 @@ int main(int argc, char **argv) {
      "set the baudrate for the uart (default=115200)")
     ("statusport", po::value<uint16_t>(&status_port)->default_value(5800),
      "set the UDP port to receive status packets to (default=5800)")
-    ("recvport", po::value<uint16_t>(&recv_port)->default_value(14550),
-     "set the UDP port to receive telemetry packets to (default=14550)")
-    ("sendport", po::value<uint16_t>(&send_port)->default_value(14551),
-     "set the UDP port to send the packets to (default=14551)")
+    ("recvport", po::value<uint16_t>(&recv_port)->default_value(14650),
+     "set the UDP port to receive telemetry packets to (default=14650)")
+    ("sendport", po::value<uint16_t>(&send_port)->default_value(14651),
+     "set the UDP port to send the packets to (default=14651)")
     ;
 
   // Declare the various combinations of options.
@@ -173,126 +173,133 @@ int main(int argc, char **argv) {
   uart.set_option(boost::asio::serial_port_base::baud_rate(baudrate));
 
   // Spawn the UART read thread
-  std::thread recv_thr([&uart, &telemetry, mavlink]() {
+  std::thread recv_thr
+    ([&uart, &telemetry, mavlink]() {
 
-    // Parse the Crossfire receiver messages
-    uint8_t stage = DEVICE_ADDRESS;
-    bool reset = false;
-    CRSFChannels channels;
-    uint8_t *cbuf = reinterpret_cast<uint8_t*>(&channels);
-    uint8_t idx = 0;
-    double prev_time = cur_time();
-    std::vector<uint8_t> obuf;
-    uint32_t CRC_errors = 0;
-    uint32_t valid_packets = 0;
-    while(1) {
+       // Parse the Crossfire receiver messages
+       uint8_t stage = DEVICE_ADDRESS;
+       bool reset = false;
+       CRSFChannels channels;
+       uint8_t *cbuf = reinterpret_cast<uint8_t*>(&channels);
+       uint8_t idx = 0;
+       double prev_time = cur_time();
+       std::vector<uint8_t> obuf;
+       uint32_t CRC_errors = 0;
+       uint32_t valid_packets = 0;
+       while(1) {
 
-      // Read a single byte from the UART
-      uint8_t c;
-      uint8_t count = boost::asio::read(uart, boost::asio::buffer(&c,1));
-      if (count <= 0) {
-        continue;
-      }
+         // Read a single byte from the UART
+         uint8_t c;
+         uint8_t count = boost::asio::read(uart, boost::asio::buffer(&c,1));
+         if (count <= 0) {
+           continue;
+         }
 
-      // Output the packet verbatim if we're not translating to mavlink
-      if (!mavlink) {
-        obuf.push_back(c);
-      }
+         // Output the packet verbatim if we're not translating to mavlink
+         if (!mavlink) {
+           obuf.push_back(c);
+         }
 
-      // Parse the frame
-      switch(stage) {
-      case DEVICE_ADDRESS:
-        // The first byte of  a frame is the device type
-        if (c == CRSF_DEVICE_TYPE) {
-          stage = FRAME_LENGTH;
-        } else {
-          obuf.clear();
-        }
-        break;
-      case FRAME_LENGTH:
-        // The second byte is the frame length
-        if (c == CRSF_FRAME_LEN) {
-          stage = FRAME_TYPE;
-        } else {
-          obuf.clear();
-          reset = true;
-        }
-        break;
-      case FRAME_TYPE:
-        // The frame type is the third byte
-        if (c == CRSF_FRAME_TYPE) {
-          stage = PAYLOAD;
-        } else {
-          obuf.clear();
-          reset = true;
-        }
-        break;
-      case PAYLOAD:
-        // Extract the bits into the payload buffer
-        cbuf[idx++] = c;
-        if(idx == sizeof(channels)) {
-          stage = CRC;
-        }
-        break;
-      case CRC:
-        uint8_t crc = crsf_crc(cbuf, sizeof(channels)); 
-       if (crc != c) {
-          ++CRC_errors;
-        } else {
-          float scale = 0.62477120195241;
-          float offset = 880.53935326418548;
-          ++valid_packets;
-          if (mavlink) {
-            telemetry.set_rc(offset + channels.ch0 * scale,
-                              offset + channels.ch1 * scale,
-                              offset + channels.ch2 * scale,
-                              offset + channels.ch3 * scale,
-                              offset + channels.ch4 * scale,
-                              offset + channels.ch5 * scale,
-                              offset + channels.ch6 * scale,
-                              offset + channels.ch7 * scale,
-                              offset + channels.ch8 * scale,
-                              offset + channels.ch9 * scale,
-                              offset + channels.ch10 * scale,
-                              offset + channels.ch11 * scale,
-                              offset + channels.ch12 * scale,
-                              offset + channels.ch13 * scale,
-                              offset + channels.ch14 * scale,
-                              offset + channels.ch15 * scale);
-          } else {
-            telemetry.send_rc(obuf);
-          }
+         // Parse the frame
+         switch(stage) {
+         case DEVICE_ADDRESS:
+           // The first byte of  a frame is the device type
+           if (c == CRSF_DEVICE_TYPE) {
+             stage = FRAME_LENGTH;
+           } else {
+             obuf.clear();
+           }
+           break;
+         case FRAME_LENGTH:
+           // The second byte is the frame length
+           if (c == CRSF_FRAME_LEN) {
+             stage = FRAME_TYPE;
+           } else {
+             obuf.clear();
+             reset = true;
+           }
+           break;
+         case FRAME_TYPE:
+           // The frame type is the third byte
+           if (c == CRSF_FRAME_TYPE) {
+             stage = PAYLOAD;
+           } else {
+             obuf.clear();
+             reset = true;
+           }
+           break;
+         case PAYLOAD:
+           // Extract the bits into the payload buffer
+           cbuf[idx++] = c;
+           if(idx == sizeof(channels)) {
+             stage = CRC;
+           }
+           break;
+         case CRC:
+           uint8_t crc = crsf_crc(cbuf, sizeof(channels)); 
+           if (crc != c) {
+             ++CRC_errors;
+           } else {
+             float scale = 0.62477120195241;
+             float offset = 880.53935326418548;
+             ++valid_packets;
+             if (mavlink) {
+               telemetry.set_rc(offset + channels.ch0 * scale,
+                                offset + channels.ch1 * scale,
+                                offset + channels.ch2 * scale,
+                                offset + channels.ch3 * scale,
+                                offset + channels.ch4 * scale,
+                                offset + channels.ch5 * scale,
+                                offset + channels.ch6 * scale,
+                                offset + channels.ch7 * scale,
+                                offset + channels.ch8 * scale,
+                                offset + channels.ch9 * scale,
+                                offset + channels.ch10 * scale,
+                                offset + channels.ch11 * scale,
+                                offset + channels.ch12 * scale,
+                                offset + channels.ch13 * scale,
+                                offset + channels.ch14 * scale,
+                                offset + channels.ch15 * scale);
+             } else {
+               telemetry.send_rc(obuf);
+             }
+           }
 
-          // Send telemetry to the Tx
-          while (!telemetry.send_queue().empty()) {
-            auto out_buf = telemetry.send_queue().pop();
-            LOG_INFO << "Sending to Tx: " << out_buf.size();
-            boost::asio::write(uart, boost::asio::buffer(out_buf.data(), out_buf.size()));
-          }
+           obuf.clear();
+           reset = true;
+           break;
+         }
 
-        }
+         if ((cur_time() - prev_time) > 5) {
+           LOG_INFO << "RC packet stats " << valid_packets << "/" << CRC_errors
+                    << " (" << 100.0 * static_cast<float>(valid_packets) /
+             static_cast<float>(valid_packets + CRC_errors) << "%)";
+           prev_time = cur_time();
+         }
 
-        obuf.clear();
-        reset = true;
-        break;
-      }
+         // Reset if requested
+         if (reset) {
+           stage = DEVICE_ADDRESS;
+           idx = 0;
+           reset = false;
+         }
+       }
+     });
 
-      if ((cur_time() - prev_time) > 5) {
-        LOG_INFO << "RC packet stats " << valid_packets << "/" << CRC_errors
-                 << " (" << 100.0 * static_cast<float>(valid_packets) /
-          static_cast<float>(valid_packets + CRC_errors) << "%)";
-        prev_time = cur_time();
-      }
-      // Reset if requested
-      if (reset) {
-        stage = DEVICE_ADDRESS;
-        idx = 0;
-        reset = false;
-      }
-    }
-  });
+  // Create a thread for relaying telemetry to the transmitter
+  std::thread telem_thr
+    ([&uart, &telemetry]() {
+
+       // Send telemetry to the Tx
+       while (true) {
+         auto out_buf = telemetry.send_queue().pop();
+         LOG_DEBUG << "Sending to Tx: " << out_buf.size();
+         boost::asio::write(uart, boost::asio::buffer(out_buf.data(), out_buf.size()));
+       }
+     });
 
   // Cleanup
   recv_thr.join();
+  telem_thr.join();
   uart.close();
 }

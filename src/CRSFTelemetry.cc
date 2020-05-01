@@ -174,6 +174,9 @@ void CRSFTelemetry::send_link_packet(int8_t rx_rssi1,
   buf.push_back(CRSF_RADIO_ADDRESS);
   buf.push_back(12); // type (1) + Payload size + CRC size (1)
   buf.push_back(CRSF_LINK);
+  LOG_DEBUG << "Link: " << int(rx_rssi1) << " " << int(rx_rssi2) << " " << int(rx_quality) << " "
+            << int(rx_snr) << " " << int(rx_antenna) << " " << int(rf_mode) << " "
+            << int(tx_power) << " " << int(tx_rssi) << " " << tx_snr;
   add_int8(buf, rx_rssi1);
   add_int8(buf, rx_rssi2);
   buf.push_back(rx_quality);
