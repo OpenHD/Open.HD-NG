@@ -2,6 +2,7 @@
 
 import os
 import sys
+import time
 import signal
 import serial
 import socket
@@ -57,15 +58,28 @@ def downstream_thread(ser, sock, host, port):
     parser = crsf.TelemetryParser()
     global run
     run = True
+    timeout = 0.1
+    prev_time = time.time()
+    buf = bytearray()
     while(run):
         # Read the next byte
         b = ser.read(1)[0]
         ret = parser.parse(b)
         if ret[0] == crsf.TelemetryState.COMPLETE:
-            # Send the telemetry packet
-            sock.sendto(ret[1], (host, port))
+            # Don't send a packet that's too large
+            if (len(buf) + len(ret[1]) > 1024):
+                # Send the telemetry packet
+                sock.sendto(buf, (host, port))
+                buf = bytearray()
+                prev_time = time.time()
+            buf.extend(ret[1])
+            if (time.time() - prev_time) > timeout:
+                # Send the telemetry packet
+                sock.sendto(buf, (host, port))
+                buf = bytearray()
+                prev_time = time.time()
         elif ret[0] == crsf.TelemetryState.PARSE_ERROR:
-            print("Error")
+            logging.debug("Error")
 
 def upstream_thread(ser, sock):
     global run
