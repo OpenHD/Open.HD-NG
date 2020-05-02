@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
   std::string conf_file;
   po::options_description generic("Generic options");
   generic.add_options()
-    ("help,h", po::bool_switch(&help), "produce help message")
+    ("help,h", "produce help message")
     ("config,c", po::value(&conf_file), "an option configuration file")
     ;
     
@@ -139,24 +139,24 @@ int main(int argc, char **argv) {
   // Parse the options
   po::variables_map vm;
   po::store(po::command_line_parser(argc, argv).options(cmdline_options).run(), vm);
-  po::notify(vm);
 
   // Display the help message if requested.
-  if (help) {
+  if (vm.count("help")) {
     std::cout << "Usage: options_description [options]\n";
     std::cout << cmdline_options;
     return EXIT_SUCCESS;
   }
 
   // Parse the config file if requests
-  if(!conf_file.empty()) {
-    std::ifstream ifs(conf_file.c_str());
+  if(vm.count("config")) {
+    std::ifstream ifs(vm["config"].as<std::string>().c_str());
     if(ifs.fail()) {
       std::cerr << "Error opening config file: " << conf_file << std::endl;
       return EXIT_FAILURE;
     }
     po::store(po::parse_config_file(ifs, config_file_options), vm);
   }
+  po::notify(vm);
 
   // Create the logger
   Logger::create(log_level, syslog_level, syslog_host);

@@ -1,6 +1,6 @@
 loglevel = critical
 sysloglevel = info
-device = /dev/ttyAMA0
+device = /dev/ttyUSB0
 baudrate = 115200
 recvport = 14650
 sendport = 14651

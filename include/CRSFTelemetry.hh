@@ -87,7 +87,7 @@ private:
   void send_gps_packet(int32_t lat, int32_t lon, uint16_t vel,
 		       uint16_t heading, uint16_t alt, uint8_t nsat);
 
-  void reader_thread(uint16_t port = 14551);
+  void reader_thread(uint16_t port = 14551, bool mavlink = false);
   void status_thread(uint16_t port = 5800);
   void control_thread();
 

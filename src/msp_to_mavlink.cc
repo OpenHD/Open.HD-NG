@@ -13,6 +13,7 @@ namespace po=boost::program_options;
 int main(int argc, char **argv) {
 
   // Declare a group of options that will be allowed only on command line
+  bool help;
   std::string conf_file;
   po::options_description generic("Generic options");
   generic.add_options()
