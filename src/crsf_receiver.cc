@@ -263,6 +263,12 @@ int main(int argc, char **argv) {
              } else {
                telemetry.send_rc(obuf);
              }
+
+             while (!telemetry.send_queue().empty()) {
+               auto out_buf = telemetry.send_queue().pop();
+               LOG_DEBUG << "Sending to Tx: " << out_buf.size();
+               boost::asio::write(uart, boost::asio::buffer(out_buf.data(), out_buf.size()));
+             }
            }
 
            obuf.clear();
@@ -286,20 +292,7 @@ int main(int argc, char **argv) {
        }
      });
 
-  // Create a thread for relaying telemetry to the transmitter
-  std::thread telem_thr
-    ([&uart, &telemetry]() {
-
-       // Send telemetry to the Tx
-       while (true) {
-         auto out_buf = telemetry.send_queue().pop();
-         LOG_DEBUG << "Sending to Tx: " << out_buf.size();
-         boost::asio::write(uart, boost::asio::buffer(out_buf.data(), out_buf.size()));
-       }
-     });
-
   // Cleanup
   recv_thr.join();
-  telem_thr.join();
   uart.close();
 }
