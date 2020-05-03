@@ -1,5 +1,5 @@
 [global]
-log_level = critical
+log_level = debug
 sydlog_level = info
 primary_camera = True
 video_port = 5600
@@ -12,10 +12,10 @@ inline_headers = 1
 intra_period = 5
 prefer_picam = 1
 fec_ratio = 0.0
-secondary_camera = False
+secondary_camera = True
 video_port_secondary = 5601
-video_width_secondary = 640
-video_height_secondary = 480
+video_width_secondary = 1280
+video_height_secondary = 720
 video_blocksize = 1400
 fps_secondary = 60
 bitrate_secondary = 5000000

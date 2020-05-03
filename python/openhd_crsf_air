@@ -87,6 +87,7 @@ def upstream_thread(ser, sock):
     while(run):
         # Read the next packet
         data, addr = sock.recvfrom(128)
+        #logging.debug("Recv %d %x" % (len(data), data[0]))
         ser.write(data)
 
 if __name__ == '__main__':
@@ -104,6 +105,11 @@ if __name__ == '__main__':
     sock.bind((source_host, source_port))
 
     # Connect to the UART
+    time.sleep(3)
+    ser = serial.Serial(uart, baudrate=baudrate)
+    time.sleep(3)
+    ser.close()
+    time.sleep(3)
     ser = serial.Serial(uart, baudrate=baudrate)
 
     # Setup the exit signal handler
@@ -115,3 +121,4 @@ if __name__ == '__main__':
     usthr.start()
     dsthr.join()
     usthr.join()
+    logging.info("exiting")
