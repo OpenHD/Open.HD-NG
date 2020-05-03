@@ -1,4 +1,6 @@
 
+import sys
+import logging
 from enum import Enum
 
 crc8tab = [
@@ -42,7 +44,7 @@ def crc8(msg):
         crc = crc8tab[crc ^ msg[i + 2]]
     return crc
 
-class TelemetryState(Enum):
+class CRSFState(Enum):
     DEVICE_ADDRESS = 0,
     FRAME_LENGTH = 1,
     FRAME_TYPE = 2,
@@ -51,42 +53,44 @@ class TelemetryState(Enum):
     COMPLETE = 5,
     PARSE_ERROR = 6
 
-class TelemetryParser:
+class CRSFParser:
 
-    def __init__(self):
-        self.state = TelemetryState.DEVICE_ADDRESS
+    def __init__(self, address):
+        self.state = CRSFState.DEVICE_ADDRESS
         self.length = 0
         self.msg = bytearray()
+        self.address = address
 
     def parse(self, c):
 
         # Reset the state if the previous message is complete
-        if self.state == TelemetryState.COMPLETE or self.state == TelemetryState.PARSE_ERROR:
+        if self.state == CRSFState.COMPLETE or self.state == CRSFState.PARSE_ERROR:
             self.msg = bytearray()
-            self.state = TelemetryState.DEVICE_ADDRESS
+            self.state = CRSFState.DEVICE_ADDRESS
 
         # Continue parsing the current messsage
-        if self.state == TelemetryState.DEVICE_ADDRESS:
-            if c == 0xc8:
-                self.state = TelemetryState.FRAME_LENGTH
+        if self.state == CRSFState.DEVICE_ADDRESS:
+            if c == self.address:
+                self.state = CRSFState.FRAME_LENGTH
                 self.msg.append(c)
-        elif self.state == TelemetryState.FRAME_LENGTH:
+        elif self.state == CRSFState.FRAME_LENGTH:
             self.length = c
             self.msg.append(c)
-            self.state = TelemetryState.FRAME_TYPE
-        elif self.state == TelemetryState.FRAME_TYPE:
+            self.state = CRSFState.FRAME_TYPE
+        elif self.state == CRSFState.FRAME_TYPE:
             self.msg.append(c)
-            self.state = TelemetryState.PAYLOAD
-        elif self.state == TelemetryState.PAYLOAD:
+            self.state = CRSFState.PAYLOAD
+        elif self.state == CRSFState.PAYLOAD:
             self.msg.append(c)
-            self.state = TelemetryState.CRC if len(self.msg) == (self.length + 1) else TelemetryState.PAYLOAD
-        elif self.state == TelemetryState.CRC:
+            self.state = CRSFState.CRC if len(self.msg) == (self.length + 1) else CRSFState.PAYLOAD
+        elif self.state == CRSFState.CRC:
             self.msg.append(c)
             crc = crc8(self.msg)
             if crc == self.msg[-1]:
-                self.state = TelemetryState.COMPLETE
+                self.state = CRSFState.COMPLETE
             else:
-                self.state = TelemetryState.PARSE_ERROR
+                logging.debug("CRC error: %x %x" % (crc, self.msg[-1]))
+                self.state = CRSFState.PARSE_ERROR
 
         # Return the current parse state and message buffer
         return [self.state, self.msg]

@@ -9,8 +9,8 @@
 #include <CRSFTelemetry.hh>
 #include <logging.hh>
 
-//#define CRSF_RADIO_ADDRESS 0xEA
-#define CRSF_RADIO_ADDRESS 0xC8
+#define CRSF_RADIO_ADDRESS_TX 0xEA
+#define CRSF_RADIO_ADDRESS_FC 0xC8
 
 typedef enum {
 	      CRSF_ATTITUDE = 0x1E,
@@ -171,7 +171,7 @@ void CRSFTelemetry::send_link_packet(int8_t rx_rssi1,
 				     uint8_t tx_snr) {
   std::shared_ptr<std::vector<uint8_t> > bufp(new std::vector<uint8_t>());
   std::vector<uint8_t> &buf = *bufp.get();
-  buf.push_back(CRSF_RADIO_ADDRESS);
+  buf.push_back(CRSF_RADIO_ADDRESS_TX);
   buf.push_back(12); // type (1) + Payload size + CRC size (1)
   buf.push_back(CRSF_LINK);
   rx_rssi1 = -20;
@@ -204,7 +204,7 @@ void CRSFTelemetry::send_link_packet(int8_t rx_rssi1,
 void CRSFTelemetry::send_attitude_packet(float yaw_deg, float pitch_deg, float roll_deg) {
   std::shared_ptr<std::vector<uint8_t> > bufp(new std::vector<uint8_t>());
   std::vector<uint8_t> &buf = *bufp.get();
-  buf.push_back(CRSF_RADIO_ADDRESS);
+  buf.push_back(CRSF_RADIO_ADDRESS_TX);
   buf.push_back(8); // type (1) + Payload size + CRC size (1)
   buf.push_back(CRSF_ATTITUDE);
   big_endian_deg_to_radians_10000(buf, yaw_deg);
@@ -217,7 +217,7 @@ void CRSFTelemetry::send_attitude_packet(float yaw_deg, float pitch_deg, float r
 void CRSFTelemetry::send_battery_packet(float v, float c, uint32_t cap, float remain) {
   std::shared_ptr<std::vector<uint8_t> > bufp(new std::vector<uint8_t>());
   std::vector<uint8_t> &buf = *bufp.get();
-  buf.push_back(CRSF_RADIO_ADDRESS);
+  buf.push_back(CRSF_RADIO_ADDRESS_TX);
   buf.push_back(10); // type (1) + Payload size + CRC size (1)
   buf.push_back(CRSF_BATTERY);
   big_endian_uint16(buf, static_cast<uint16_t>(rint(v * 100.0)));
@@ -232,7 +232,7 @@ void CRSFTelemetry::send_gps_packet(int32_t lat, int32_t lon, uint16_t vel,
 				    uint16_t heading, uint16_t alt, uint8_t nsat) {
   std::shared_ptr<std::vector<uint8_t> > bufp(new std::vector<uint8_t>());
   std::vector<uint8_t> &buf = *bufp.get();
-  buf.push_back(CRSF_RADIO_ADDRESS);
+  buf.push_back(CRSF_RADIO_ADDRESS_TX);
   buf.push_back(17); // type (1) + Payload size + CRC size (1)
   buf.push_back(CRSF_GPS);
   big_endian_int32(buf, lat);
@@ -437,6 +437,9 @@ void CRSFTelemetry::reader_thread(uint16_t port, bool mavlink) {
     } else {
       // Just send it on to the Tx for now
       LOG_DEBUG << "Telem recv: " << length;
+      if (data[0] == CRSF_RADIO_ADDRESS_FC) {
+        data[0] = CRSF_RADIO_ADDRESS_TX;
+      }
       m_send_queue.push(std::vector<uint8_t>(data, data + length));
     }
   }

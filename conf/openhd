@@ -60,3 +60,11 @@ source_host = 127.0.0.1
 source_port = 14651
 target_host = 127.0.0.1
 target_port = 14650
+
+[crsf_ground]
+uart = /dev/ttyUSB0
+baudrate = 115200
+source_host = 127.0.0.1
+source_port = 14650
+target_host = 127.0.0.1
+target_port = 14651
