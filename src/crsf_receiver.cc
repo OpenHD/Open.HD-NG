@@ -59,12 +59,6 @@ struct CRSFChannels {
   uint16_t ch15 : 11;
 } __attribute__ ((__packed__));
 
-double cur_time() {
-  struct timeval t;
-  gettimeofday(&t, NULL);
-  return (double(t.tv_sec) + double(t.tv_usec) * 1e-6);
-}
-
 uint8_t crc8_dvb_s2(uint8_t crc, unsigned char a) {
   crc ^= a;
   for (int ii = 0; ii < 8; ++ii) {

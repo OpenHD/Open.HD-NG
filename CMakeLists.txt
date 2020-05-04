@@ -96,7 +96,11 @@ install(TARGETS msp_to_mavlink DESTINATION ${BinDir} COMPONENT applications)
 target_link_libraries(msp_to_mavlink ${Boost_LIBRARIES} msp_fcu pthread)
 
 # Build the TBS Crossfire interface
-add_executable(crsf_receiver src/crsf_receiver.cc src/CRSFTelemetry.cc src/logging.cc)
+add_executable(crsf_receiver
+  src/crsf_receiver.cc
+  src/CRSFTelemetry.cc
+  src/CRSFMavlinkTelemetry.cc
+  src/logging.cc)
 install(TARGETS crsf_receiver DESTINATION ${BinDir} COMPONENT applications)
 target_link_libraries(crsf_receiver ${Boost_LIBRARIES} pthread)
 

@@ -11,6 +11,16 @@
 #include <shared_queue.hh>
 
 
+#define CRSF_RADIO_ADDRESS_TX 0xEA
+#define CRSF_RADIO_ADDRESS_FC 0xC8
+
+typedef enum {
+	      CRSF_ATTITUDE = 0x1E,
+	      CRSF_BATTERY = 0x08,
+	      CRSF_LINK = 0x14,
+	      CRSF_GPS = 0x02
+} CRSFTelemetryType;
+
 // Standard OpenHD stats structures.
 typedef struct {
   uint32_t received_packet_cnt;
@@ -106,6 +116,13 @@ private:
   boost::asio::io_service m_send_service;
   boost::asio::ip::udp::socket m_send_sock;
   boost::asio::ip::udp::endpoint m_sender_endpoint;
+  double m_last_telemetry_packet_time;
 };
+
+inline double cur_time() {
+  struct timeval t;
+  gettimeofday(&t, 0);
+  return double(t.tv_sec) + double(t.tv_usec) * 1e-6;
+}
 
 #endif /* OPENHDNG_CRSFTELEMETRY_HH */
