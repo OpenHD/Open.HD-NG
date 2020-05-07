@@ -5,4 +5,3 @@
 systemctl enable /lib/systemd/system/openhd.service
 systemctl enable /lib/systemd/system/camera.service
 systemctl enable /lib/systemd/system/crsf_air.service
-systemctl enable /lib/systemd/system/crsf.service

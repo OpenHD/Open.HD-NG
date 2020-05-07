@@ -1,10 +1,10 @@
 [global]
-log_level = debug
+log_level = critical
 sydlog_level = info
 primary_camera = True
 video_port = 5600
-video_width = 1280
-video_height = 720
+video_width = 2560
+video_height = 1280
 fps = 60
 bitrate = 5000000
 quality = 20
@@ -54,7 +54,7 @@ baudrate = 115200
 port = 14550
 
 [crsf_air]
-uart = /dev/ttyAMA0
+uart = /dev/ttyS1
 baudrate = 500000
 source_host = 127.0.0.1
 source_port = 14651

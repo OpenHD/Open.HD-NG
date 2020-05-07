@@ -1,0 +1,12 @@
+[Unit]
+Description=Ground-side RTSP server for OpenHD
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/rtsp-simple-server
+TimeoutStopSec=5s
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=ground.target

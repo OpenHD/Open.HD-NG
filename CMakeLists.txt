@@ -71,9 +71,6 @@ endif ()
 add_subdirectory(modules/msp)
 include_directories(modules/msp/inc)
 
-# Add the inav directory to the include path
-include_directories(/modules/modules/inav/src/main)
-
 # Add the python directory to the list of directories to build
 add_subdirectory(python)
 
@@ -118,6 +115,8 @@ install(FILES "${PROJECT_SOURCE_DIR}/services/crsf_air.service" DESTINATION lib/
 install(FILES "${PROJECT_SOURCE_DIR}/services/mavlink_air.service" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/mavlink_ground.service" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/mavlink_transmitter.service" DESTINATION lib/systemd/system COMPONENT configuration)
+install(FILES "${PROJECT_SOURCE_DIR}/services/openhd_rtsp.service" DESTINATION lib/systemd/system COMPONENT configuration)
+install(FILES "${PROJECT_SOURCE_DIR}/services/rtsp.service" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/air.target" DESTINATION lib/systemd/system COMPONENT configuration)
 install(FILES "${PROJECT_SOURCE_DIR}/services/ground.target" DESTINATION lib/systemd/system COMPONENT configuration)
 

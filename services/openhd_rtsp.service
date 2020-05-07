@@ -1,0 +1,12 @@
+[Unit]
+Description=Ground-side openhd to RTSP server for OpenHD
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ffmpeg -i udp://localhost:5600 -c copy -f rtsp rtsp://localhost:8554/openhd
+TimeoutStopSec=5s
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=ground.target
